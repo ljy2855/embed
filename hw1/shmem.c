@@ -1,5 +1,10 @@
 #include "shmem.h"
 
+struct sembuf p1 = {0, -1, SEM_UNDO};
+struct sembuf  p2 = {1, -1, SEM_UNDO};
+struct sembuf v1 = {0, 1, SEM_UNDO}; 
+struct sembuf  v2 = {1, 1, SEM_UNDO};
+
 void getseg(struct databuf **p1, struct databuf **p2)
 {
     if ((shm_id1 = shmget(SHARED_KEY1, sizeof(struct databuf), 0600 | IFLAGS)) == -1)

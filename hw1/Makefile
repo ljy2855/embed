@@ -11,4 +11,4 @@ main : main.c $(OBJS)
 	$(CC) -o main main.c $(OBJS)
 
 clean :
-	rm main main.o shmem.o message.o
+	rm main shmem.o message.o

@@ -11,8 +11,8 @@
 #define ERR ((struct databuf *)-1)
 #define SIZE 2048
 
-struct sembuf p1 = {0, -1, SEM_UNDO}, p2 = {1, -1, SEM_UNDO};
-struct sembuf v1 = {0, 1, SEM_UNDO}, v2 = {1, 1, SEM_UNDO};
+
+
 struct databuf
 { /* data 와 read count 저장 */
     int d_nread;
