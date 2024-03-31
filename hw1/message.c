@@ -11,7 +11,7 @@ int init_message_queue()
     return msgid;
 }
 
-void receive_message(int message_id, char *text)
+void send_message(int message_id, char *text)
 {
     struct msgbuf mesg;
     int flag = 0;
@@ -26,7 +26,7 @@ void receive_message(int message_id, char *text)
     printf("message send sucess\n");
 }
 
-void send_message(int message_id, char *text)
+void receive_message(int message_id, char *text)
 {
     struct msgbuf mesg;
     int flag = 0;

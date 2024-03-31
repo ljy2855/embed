@@ -33,6 +33,7 @@ typedef struct storage_list
     storage_meta *tail;
 } storage_list;
 
+void init_store();
 table get_pair(int key);
 void merge();
 void flush();

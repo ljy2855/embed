@@ -17,7 +17,7 @@ static int list_length(storage_list *list);
 static void popleft(storage_list *list);
 
 // KVS interface
-void init()
+void init_store()
 {
     load_storage();
     memory_index = 0;
@@ -106,9 +106,10 @@ void merge()
     // get table from storage
     for (cur = meta_list.head; cur != NULL && storage_cnt != MERGE_TABLE_SIZE; cur = cur->next, storage_cnt++)
     {
-        fsetpos(cur->fp, 0);
+        rewind(cur->fp);
         while (fscanf(cur->fp, "%d %d %s", &temp[table_cnt].index, &temp[table_cnt].key, temp[table_cnt].value) == 3)
         {
+            printf("%d %d %s\n",temp[table_cnt].index, temp[table_cnt].key, temp[table_cnt].value);
             table_cnt++;
         }
     }
@@ -253,20 +254,31 @@ static void insert_node(storage_list *list, FILE *fp, int index, char *filename)
     storage_meta *newNode = (storage_meta *)malloc(sizeof(storage_meta));
     newNode->fp = fp;
     newNode->index = index;
-    newNode->next = NULL;
     strcpy(newNode->filename, filename);
+    newNode->next = newNode->prev = NULL;
 
-    if (list->tail == NULL)
-    {
-        newNode->prev = NULL;
-        list->head = newNode;
-        list->tail = newNode;
-    }
-    else
-    {
-        list->tail->next = newNode;
-        newNode->prev = list->tail;
-        list->tail = newNode;
+    if (list->head == NULL) {
+        list->head = list->tail = newNode;
+    } else {
+        storage_meta *current = list->head;
+        while (current != NULL && current->index < index) {
+            current = current->next;
+        }
+
+        if (current == list->head) {
+            newNode->next = list->head;
+            list->head->prev = newNode;
+            list->head = newNode;
+        } else if (current == NULL) {
+            list->tail->next = newNode;
+            newNode->prev = list->tail;
+            list->tail = newNode;
+        } else {
+            newNode->next = current;
+            newNode->prev = current->prev;
+            current->prev->next = newNode;
+            current->prev = newNode;
+        }
     }
 }
 

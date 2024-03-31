@@ -52,37 +52,59 @@ void remobj(void)
         exit(1);
 }
 
-// reader – 파일 읽기 처리 (표준입력  공유 메모리)
-void reader(int semid, struct databuf *buf1, struct databuf *buf2)
-{
-    for (;;)
-    {
-        buf1->d_nread = read(0, buf1->d_buf, SIZE);
-        semop(semid, &v1, 1);
-        semop(semid, &p2, 1);
-        if (buf1->d_nread <= 0)
-            return;
-        buf2->d_nread = read(0, buf2->d_buf, SIZE);
-        semop(semid, &v1, 1);
-        semop(semid, &p2, 1);
-        if (buf2->d_nread <= 0)
-            return;
-    }
+void write_shm(int semid, struct databuf *buf, char * data){
+    buf->d_nread = strlen(data);
+    strncpy(buf->d_buf, data, buf->d_nread);
+
+    semop(semid, &v1, 1);
+    semop(semid, &p2, 1);
+    
 }
 
-void writer(int semid, struct databuf *buf1, struct databuf *buf2)
-{
-    for (;;)
-    {
-        semop(semid, &p1, 1);
-        semop(semid, &v2, 1);
-        if (buf1->d_nread <= 0)
-            return;
-        write(1, buf1->d_buf, buf1->d_nread);
-        semop(semid, &p1, 1);
-        semop(semid, &v2, 1);
-        if (buf2->d_nread <= 0)
-            return;
-        write(1, buf2->d_buf, buf2->d_nread);
+void read_shm(int semid, struct databuf * buf, char * data){
+    
+    semop(semid, &p1, 1);
+    semop(semid, &v2, 1);
+    if (buf->d_nread > 0) {
+        strncpy(data, buf->d_buf, buf->d_nread);
+        data[buf->d_nread] = '\0'; 
+        buf->d_nread = 0;
     }
+
 }
+
+
+
+// void reader(int semid, struct databuf *buf1, struct databuf *buf2)
+// {
+//     for (;;)
+//     {
+//         buf1->d_nread = read(0, buf1->d_buf, SIZE);
+//         semop(semid, &v1, 1);
+//         semop(semid, &p2, 1);
+//         if (buf1->d_nread <= 0)
+//             return;
+//         buf2->d_nread = read(0, buf2->d_buf, SIZE);
+//         semop(semid, &v1, 1);
+//         semop(semid, &p2, 1);
+//         if (buf2->d_nread <= 0)
+//             return;
+//     }
+// }
+
+// void writer(int semid, struct databuf *buf1, struct databuf *buf2)
+// {
+//     for (;;)
+//     {
+//         semop(semid, &p1, 1);
+//         semop(semid, &v2, 1);
+//         if (buf1->d_nread <= 0)
+//             return;
+//         write(1, buf1->d_buf, buf1->d_nread);
+//         semop(semid, &p1, 1);
+//         semop(semid, &v2, 1);
+//         if (buf2->d_nread <= 0)
+//             return;
+//         write(1, buf2->d_buf, buf2->d_nread);
+//     }
+// }
