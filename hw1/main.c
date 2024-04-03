@@ -114,11 +114,12 @@ void io_process()
         case 'B':
             io_data.input_type = READ_KEY;
             io_data.value = BACK;
+            flag = 0;
             break;
         default:
             continue;
         }
-
+        printf("send\n");
         send_message(message_id, &io_data);
     }
 
