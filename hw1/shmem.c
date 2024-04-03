@@ -1,9 +1,9 @@
 #include "shmem.h"
 
 struct sembuf p1 = {0, -1, SEM_UNDO};
-struct sembuf  p2 = {1, -1, SEM_UNDO};
-struct sembuf v1 = {0, 1, SEM_UNDO}; 
-struct sembuf  v2 = {1, 1, SEM_UNDO};
+struct sembuf p2 = {1, -1, SEM_UNDO};
+struct sembuf v1 = {0, 1, SEM_UNDO};
+struct sembuf v2 = {1, 1, SEM_UNDO};
 
 void getseg(struct databuf **p1, struct databuf **p2)
 {
@@ -29,10 +29,10 @@ void getseg(struct databuf **p1, struct databuf **p2)
     }
 }
 
-int getsem(void)
+int getsem(int val)
 {
     semun x;
-    x.val = 0;
+    x.val = val;
     int id = -1;
     if ((id = semget(SEM_KEY, 2, 0600 | IFLAGS)) == -1)
         exit(1);
@@ -42,6 +42,15 @@ int getsem(void)
         exit(1);
     return (id);
 }
+void V(int sem_id)
+{
+    struct sembuf sem_b;
+    sem_b.sem_num = 0;
+    sem_b.sem_op = 1; // V 연산
+    sem_b.sem_flg = SEM_UNDO;
+    semop(sem_id, &sem_b, 1);
+}
+
 void remobj(void)
 {
     if (shmctl(shm_id1, IPC_RMID, 0) == -1)
@@ -52,28 +61,27 @@ void remobj(void)
         exit(1);
 }
 
-void write_shm(int semid, struct databuf *buf, char * data){
+void write_shm(int semid, struct databuf *buf, char *data)
+{
     buf->d_nread = strlen(data);
     strncpy(buf->d_buf, data, buf->d_nread);
 
     semop(semid, &v1, 1);
     semop(semid, &p2, 1);
-    
 }
 
-void read_shm(int semid, struct databuf * buf, char * data){
-    
+void read_shm(int semid, struct databuf *buf, char *data)
+{
+
     semop(semid, &p1, 1);
     semop(semid, &v2, 1);
-    if (buf->d_nread > 0) {
+    if (buf->d_nread > 0)
+    {
         strncpy(data, buf->d_buf, buf->d_nread);
-        data[buf->d_nread] = '\0'; 
+        data[buf->d_nread] = '\0';
         buf->d_nread = 0;
     }
-
 }
-
-
 
 // void reader(int semid, struct databuf *buf1, struct databuf *buf2)
 // {

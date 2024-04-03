@@ -4,15 +4,16 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
+#include "protocol.h"
 
 #define MAX_MESSAGE_SIZE 80
 
 struct msgbuf
 {
     long mtype;
-    char mtext[MAX_MESSAGE_SIZE];
+    io_protocol data;
 };
 
 int init_message_queue();
-void receive_message(int message_id, char *text);
-void send_message(int message_id, char *text);
+void receive_message(int message_id, io_protocol *protocol);
+void send_message(int message_id, io_protocol *protocol);

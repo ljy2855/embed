@@ -12,7 +12,7 @@ store.o : store.h store.c
 	$(CC) -c store.c
 
 main : main.c $(OBJS)
-	$(CC) -o main main.c $(OBJS)
+	$(CC) -o main main.c protocol.h $(OBJS)
 
 clean :
 	rm main shmem.o message.o store.o

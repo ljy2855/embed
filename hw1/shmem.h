@@ -18,7 +18,7 @@ struct databuf
     char d_buf[SIZE];
 };
 
-typedef union
+typedef union semun
 {
     int val;
     struct semid_ds *buf;
@@ -28,7 +28,9 @@ typedef union
 static int shm_id1, shm_id2, sem_id;
 
 void getseg(struct databuf **p1, struct databuf **p2);
-int getsem(void);
+int getsem(int val);
+void P(int sem_id);
+void V(int sem_id);
 void remobj(void);
-void write_shm(int semid, struct databuf *buf, char * data);
-void read_shm(int semid, struct databuf *buf, char * data);
+void write_shm(int semid, struct databuf *buf, char *data);
+void read_shm(int semid, struct databuf *buf, char *data);
