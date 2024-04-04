@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "sem.h": "c",
-        "shm.h": "c",
-        "shmem.h": "c",
-        "stdlib.h": "c"
-    }
-}
