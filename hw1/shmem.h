@@ -1,3 +1,6 @@
+#ifndef SHMEM_H
+#define SHMEM_H
+
 #define _POSIX_UNION_SEMUN
 
 #include <sys/shm.h>
@@ -5,12 +8,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SHARED_KEY1 (key_t)0x10 /* 공유 메모리 키 */
-#define SHARED_KEY2 (key_t)0x15 /*공유 메모리 키 */
+#define SHARED_KEY1 (key_t)0x11 /* 공유 메모리 키 */
+#define SHARED_KEY2 (key_t)0x14 /*공유 메모리 키 */
 #define SEM_KEY (key_t)0x20     /* 세마포 키 */
 #define IFLAGS (IPC_CREAT)
 #define ERR ((struct databuf *)-1)
-#define SIZE 2048
+#define SIZE 2
 
 struct databuf
 { /* data 와 read count 저장 */
@@ -34,3 +37,5 @@ void V(int sem_id);
 void remobj(void);
 void write_shm(int semid, struct databuf *buf, char *data);
 void read_shm(int semid, struct databuf *buf, char *data);
+
+#endif

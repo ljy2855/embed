@@ -1,6 +1,7 @@
 #include "message.h"
 #include "shmem.h"
 #include "store.h"
+#include "io.h"
 #include <unistd.h>
 #include <stdio.h>
 
@@ -19,8 +20,13 @@ enum INPUT_MODE
     DIGIT,
 };
 
+enum PUT_INPUT_MODE
+{
+    KEY,
+    VALUE,
+};
 int message_id;
-int io_sem;
+int exit_sem;
 struct databuf *buf1, *buf2;
 void io_process();
 void main_process();
@@ -34,7 +40,7 @@ int main(void)
     init_store();
     message_id = init_message_queue();
     sem_id = getsem(0);
-    io_sem = getsem(1);
+    exit_sem = getsem(0);
     getseg(&buf1, &buf2);
 
     if (fork() == 0)
@@ -61,6 +67,9 @@ void main_process()
     enum MODE mode = PUT;
     char key[5] = INITIAL_KEY;
     char value[10] = INITIAL_VALUE;
+    enum PUT_INPUT_MODE put_input_mode = KEY;
+    enum INPUT_MODE input_mode = ENG;
+    merge_result result;
     table temp;
     while (flag)
     {
@@ -72,6 +81,15 @@ void main_process()
         {
             // terminate program
             // TODO flush memory to storage
+            
+            flush();
+            if (storage_cnt() == 3)
+            {
+                write_shm(sem_id, buf1, "M");
+                P(exit_sem);
+            }
+            write_shm(sem_id, buf1, "B");
+            
             break;
         }
         if (io_data.input_type == READ_KEY && io_data.value != PROG)
@@ -80,6 +98,8 @@ void main_process()
             // change mode
             strcpy(key, INITIAL_KEY);
             strcpy(value, INITIAL_VALUE);
+            put_input_mode = KEY;
+            input_mode = ENG;
             if (io_data.value == VOL_UP)
                 mode = (mode + 1) % 3;
             else if (io_data.value == VOL_DOWN)
@@ -92,32 +112,86 @@ void main_process()
         switch (mode)
         {
         case PUT:
+            if (io_data.input_type == SWITCH && io_data.value == ONE_LONG)
+            {
+                strcpy(key, INITIAL_KEY);
+                strcpy(value, INITIAL_VALUE);
+                put_input_mode = KEY;
+                input_mode = ENG;
+            }
+            else if (io_data.input_type == SWITCH && io_data.value == FOUR_SIX)
+            {
+                if (strcmp(key, INITIAL_KEY) == 0 || strcmp(value, INITIAL_VALUE) == 0)
+                    break;
+                put_pair(atoi(key), value);
+                if (storage_cnt() == 3)
+                {
+                    write_shm(sem_id, buf1, "M");
+                }
+            }
+            else if (io_data.input_type == RESET)
+            {
+                put_input_mode = (put_input_mode + 1) % 2;
+            }
+            else
+            {
+                // input key or value
+                if (put_input_mode == KEY)
+                {
+                    // input key
+                    if (io_data.value <= NINE)
+                    {
+                        add_char_and_update(key, io_data.value + '0');
+                        printf("update key : %s\n", key);
+                    }
+                }
+                else
+                {
+                    process_value(value, io_data.value);
+                    printf("update value : %s\n", value);
+                }
+            }
             break;
         case GET:
-            printf("cur key: %s\n", key);
+
             if (io_data.input_type == SWITCH)
             {
                 if (io_data.value <= NINE)
                 {
                     add_char_and_update(key, io_data.value + '0');
                 }
-                // TODO reset key
+                printf("cur key: %s\n", key);
             }
-            if (io_data.input_type == READ_KEY)
+            if (io_data.input_type == RESET)
             {
                 // submit
+                if (strcmp(key, INITIAL_KEY) == 0)
+                    break;
                 temp = get_pair(atoi(key));
+                // printf("%d\n", atoi(key));
                 if (temp.index == NOT_FOUND)
                 {
                     // TODO PRINT ERROR
+                    printf("Error\n");
                 }
                 else
                 {
                     // TODO PRINT OUTPUT
+                    printf("[%d] %d %s\n", temp.index, temp.key, temp.value);
                 }
             }
+
             break;
         case MERGE:
+            if (io_data.input_type == RESET)
+            {
+                if (storage_cnt() >= 2)
+                {
+                    result = merge();
+                    // print result LCD
+                    // TODO spin motor
+                }
+            }
             break;
         }
     }
@@ -125,81 +199,40 @@ void main_process()
 
 void io_process()
 {
-    char command[MAX_MESSAGE_SIZE];
-    int flag = 1;
     char key;
     io_protocol io_data;
-    while (flag)
+    while (1)
     {
         scanf("%c%*c", &key);
         if (key == '\n')
             continue;
-        switch (key) // TODO change
-        {
-        case '1':
-            io_data.input_type = SWITCH;
-            io_data.value = ONE;
-            break;
-        case '2':
-            io_data.input_type = SWITCH;
-            io_data.value = TWO;
-            break;
-        case '3':
-            io_data.input_type = SWITCH;
-            io_data.value = THREE;
-            break;
-        case '4':
-            io_data.input_type = SWITCH;
-            io_data.value = FOUR;
-            break;
-        case '5':
-            io_data.input_type = SWITCH;
-            io_data.value = FIVE;
-            break;
-        case '6':
-            io_data.input_type = SWITCH;
-            io_data.value = SIX;
-            break;
-        case '7':
-            io_data.input_type = SWITCH;
-            io_data.value = SEVEN;
-            break;
-        case '8':
-            io_data.input_type = SWITCH;
-            io_data.value = EIGHT;
-            break;
-        case '9':
-            io_data.input_type = SWITCH;
-            io_data.value = NINE;
-            break;
-        case 'B':
-            io_data.input_type = READ_KEY;
-            io_data.value = BACK;
-            flag = 0;
-            break;
-        case 'R':
-            io_data.input_type = RESET;
-            break;
-        case '+':
-            io_data.input_type = READ_KEY;
-            io_data.value = VOL_UP;
-            break;
-        case '-':
-            io_data.input_type = READ_KEY;
-            io_data.value = VOL_DOWN;
-            break;
-        default:
-            continue;
-        }
+        io_data = preprocess_io(key);
         printf("send\n");
         send_message(message_id, &io_data);
+        if (io_data.input_type == READ_KEY && io_data.value == BACK)
+            break;
     }
-
-    // write_shm(sem_id,buf1,command);
 }
 
 void merge_process()
 {
+    char message[2];
+    while (1)
+    {
+        read_shm(sem_id, buf1, message);
+
+        if (message[0] == 'M')
+        {
+            printf("Background merge start\n");
+            merge();
+            V(exit_sem);
+        }
+
+        if (message[0] == 'B')
+        {
+            exit(0);
+        }
+    }
 }
 
 // helpers

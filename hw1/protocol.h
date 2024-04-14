@@ -1,3 +1,5 @@
+#ifndef PROTOCOL_H
+#define PROTOCOL_H
 
 enum INPUT_TYPE
 {
@@ -26,7 +28,7 @@ enum SWITCH_TYPE
     EIGHT,
     NINE,
     ONE_LONG,
-    RESET_SWITCH,
+    FOUR_SIX,
 };
 
 typedef struct io_protocol
@@ -34,3 +36,4 @@ typedef struct io_protocol
     enum INPUT_TYPE input_type;
     int value;
 } io_protocol;
+#endif

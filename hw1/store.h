@@ -20,7 +20,6 @@ typedef struct table
 
 typedef struct storage_meta
 {
-    FILE *fp;
     int index;
     char filename[20];
     struct storage_meta *prev;
@@ -29,12 +28,21 @@ typedef struct storage_meta
 
 typedef struct storage_list
 {
+    int index;
     storage_meta *head;
     storage_meta *tail;
 } storage_list;
 
+typedef struct merge_result
+{
+    int cnt;
+    char filename[20];
+} merge_result;
+
 void init_store();
 table get_pair(int key);
-void merge();
+merge_result merge();
 void flush();
 void put_pair(int key, char *value);
+int storage_cnt();
+void print_list();
