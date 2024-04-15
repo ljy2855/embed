@@ -29,10 +29,12 @@ int dev_fnd;
 int dev_dip_switch;
 int led_fd;
 
+pid_t led_pid;
+
 enum input_type{
-    SWITCH,
-    READ_KEY,
-    RESET,
+    PRESS_SWITCH,
+    PRESS_READ_KEY,
+    PRESS_RESET,
 };
 
 struct pollfd input_fds[3];
@@ -161,11 +163,10 @@ void process_value(char *current_input, int key)
             if (last_key == key && len > 0)
             {
                 // 같은 키를 눌렀다면, 순환
-                if (len == MAX_LENGTH)
-                {
+                
                     press_count = (press_count + 1) % strlen(key_map[key]);
                     current_input[len - 1] = key_map[key][press_count]; // 마지막 문자 업데이트
-                }
+               
             }
             else
             {
@@ -228,7 +229,8 @@ void init_device()
 void run_motor(){
     unsigned char motor_state[3];
     memset(motor_state,0,sizeof(motor_state));
-    motor_state[0] =1;
+    motor_state[0] =1; // start
+    motor_state[2] =10; // set speed
     write(dev_motor,motor_state,3);
     sleep(1);
     motor_state[0] =0;
@@ -261,32 +263,35 @@ void print_lcd(char * line1, char * line2){
     write(dev_lcd,string,MAX_BUFF);	
 }
 
+
+
 int read_input(){
     int ret;
+    int i;
     ssize_t count;
     ret = poll(input_fds, 3, -1); // 무한 대기
     if (ret == -1) {
-        handle_error("poll failed");
+        // handle_error("poll failed");
     }
 
-    for (int i = 0; i < 3; i++) {
+    for (i = 0; i < 3; i++) {
         if (input_fds[i].revents & POLLIN) {
             switch (i)
             {
-            case SWITCH:
+            case PRESS_SWITCH:
                 /* code */
                 break;
             
-            case READ_KEY:
+            case PRESS_READ_KEY:
                 /* code */
                 break;
-            case RESET:
+            case PRESS_RESET:
                 /* code */
                 break;
             }
             // ssize_t count = read(input_fds[i].fd, buffer, BUFFER_SIZE - 1);
             if (count == -1) {
-                handle_error("read failed");
+                // handle_error("read failed");
             }
         }
     }

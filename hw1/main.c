@@ -38,6 +38,7 @@ int main(void)
 
     // intialize
     init_store();
+    init_device();
     message_id = init_message_queue();
     sem_id = getsem(0);
     exit_sem = getsem(0);
@@ -61,7 +62,7 @@ int main(void)
 
 void main_process()
 {
-    char command[MAX_MESSAGE_SIZE];
+    char line1[17], line2[17];
     int flag = 1;
     io_protocol io_data;
     enum MODE mode = PUT;
@@ -112,6 +113,8 @@ void main_process()
         switch (mode)
         {
         case PUT:
+            
+
             if (io_data.input_type == SWITCH && io_data.value == ONE_LONG)
             {
                 strcpy(key, INITIAL_KEY);
@@ -151,9 +154,13 @@ void main_process()
                     printf("update value : %s\n", value);
                 }
             }
+            print_fnd(key);
+
             break;
         case GET:
-
+            memset(line1,0,17);
+            memset(line2,0,17);
+            sprintf(line1,"GET MODE");
             if (io_data.input_type == SWITCH)
             {
                 if (io_data.value <= NINE)
@@ -172,14 +179,18 @@ void main_process()
                 if (temp.index == NOT_FOUND)
                 {
                     // TODO PRINT ERROR
-                    printf("Error\n");
+                    sprintf(line2,"Error");
+
                 }
                 else
                 {
                     // TODO PRINT OUTPUT
+                    sprintf(line2,"(%d, %d,%s)",temp.index,temp.key,temp.value);
                     printf("[%d] %d %s\n", temp.index, temp.key, temp.value);
                 }
             }
+            print_fnd(key);
+            print_lcd(line1,line2);
 
             break;
         case MERGE:
@@ -187,7 +198,11 @@ void main_process()
             {
                 if (storage_cnt() >= 2)
                 {
+                    run_motor();
                     result = merge();
+                    sprintf(line1,"%d merged",result.cnt);
+                    sprintf(line2,"%s generated",result.filename);
+                    print_lcd(line1,line2);
                     // print result LCD
                     // TODO spin motor
                 }
@@ -224,6 +239,7 @@ void merge_process()
         if (message[0] == 'M')
         {
             printf("Background merge start\n");
+            run_motor();
             merge();
             V(exit_sem);
         }
