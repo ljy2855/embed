@@ -39,7 +39,6 @@ unsigned long *fpga_addr = 0;
 
 pid_t led_pid = 0;
 
-
 enum input_type
 {
     PRESS_SWITCH,
@@ -195,7 +194,6 @@ void process_value(char *current_input, int key)
 void init_device()
 {
 
-    
     // init device driver
     dev_motor = open(FPGA_STEP_MOTOR_DEVICE, O_WRONLY);
     assert(dev_motor >= 0);
@@ -234,24 +232,34 @@ void init_device()
     led_addr = (unsigned char *)((void *)fpga_addr + LED_ADDR);
 }
 
-void cleanup_device() {
+void cleanup_device()
+{
     // 닫을 디바이스 핸들
-    if (dev_motor >= 0) close(dev_motor);
-    if (dev_lcd >= 0) close(dev_lcd);
-    if (dev_readkey >= 0) close(dev_readkey);
-    if (dev_switch >= 0) close(dev_switch);
-    if (dev_fnd >= 0) close(dev_fnd);
-    if (dev_dip_switch >= 0) close(dev_dip_switch);
+    if (dev_motor >= 0)
+        close(dev_motor);
+    if (dev_lcd >= 0)
+        close(dev_lcd);
+    if (dev_readkey >= 0)
+        close(dev_readkey);
+    if (dev_switch >= 0)
+        close(dev_switch);
+    if (dev_fnd >= 0)
+        close(dev_fnd);
+    if (dev_dip_switch >= 0)
+        close(dev_dip_switch);
 
     // 메모리 매핑 해제
-    if (fpga_addr != MAP_FAILED) {
-        if (munmap((void *)fpga_addr, 4096) == -1) {
+    if (fpga_addr != MAP_FAILED)
+    {
+        if (munmap((void *)fpga_addr, 4096) == -1)
+        {
             printf("munmap led_addr failed");
         }
     }
 
     // 메모리 디바이스 파일 닫기
-    if (led_fd >= 0) close(led_fd);
+    if (led_fd >= 0)
+        close(led_fd);
 }
 
 void run_motor()
@@ -334,10 +342,10 @@ void control_led(unsigned char led1, unsigned char led2, unsigned char all)
     else
     {
         perror("Failed to fork");
-        
     }
 }
-void kill_led(){
+void kill_led()
+{
     if (led_pid != 0)
     {
         if (kill(led_pid, 0) == 0)
@@ -354,15 +362,14 @@ char read_input()
 {
     int ret;
     int i;
-    ssize_t count;
-    unsigned char dip_sw_buff = 0;  
     unsigned char push_sw_buff[MAX_BUTTON];
     struct input_event ev[BUFF_SIZE];
-	int size = sizeof (struct input_event);
+    int size = sizeof(struct input_event);
+
     ret = poll(input_fds, 3, -1); // 무한 대기
     if (ret == -1)
     {
-        // handle_error("poll failed");
+        printf("read fail\n");
     }
 
     for (i = 0; i < 3; i++)
@@ -372,38 +379,45 @@ char read_input()
             switch (i)
             {
             case PRESS_SWITCH:
-                /* code */
-                read(dev_switch, &push_sw_buff, sizeof(push_sw_buff));
-                for(i = 0 ; i < MAX_BUTTON ;i++){
-                    if(push_sw_buff[i]){
-                        return '1' + i;
+                if (read(dev_switch, &push_sw_buff, sizeof(push_sw_buff)) > 0)
+                {
+                    for (int j = 0; j < MAX_BUTTON; j++)
+                    {
+                        if (push_sw_buff[j])
+                        {
+                            return '1' + j;
+                        }
                     }
                 }
                 break;
 
             case PRESS_READ_KEY:
-                /* code */
-                read (dev_readkey, ev, size * BUFF_SIZE);
-                if(ev[0].code == 158)
-                    return 'B';
-                if(ev[0].code == 115)
-                    return '+';
-                if(ev[0].code == 114)
-                    return '-';
+                if (read(dev_readkey, ev, size * BUFF_SIZE) > 0)
+                {
+                    if (ev[0].type == EV_KEY && ev[0].value == 1)
+                    { // Key press event
+                        switch (ev[0].code)
+                        {
+                        case KEY_BACK:
+                            return 'B';
+                        case KEY_VOLUMEUP:
+                            return '+';
+                        case KEY_VOLUMEDOWN:
+                            return '-';
+                        }
+                    }
+                }
                 break;
+
             case PRESS_RESET:
-                read(dev_dip_switch, &dip_sw_buff, 1);
-                return 'R';
-                /* code */
+                if (read(dev_dip_switch, &push_sw_buff[0], 1) > 0)
+                {
+                    return 'R';
+                }
                 break;
-            }
-            // ssize_t count = read(input_fds[i].fd, buffer, BUFFER_SIZE - 1);
-            if (count == -1)
-            {
-                // handle_error("read failed");
             }
         }
     }
 
-    return -1;
+    return -1; // No input detected
 }
