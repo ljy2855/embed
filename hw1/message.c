@@ -37,7 +37,6 @@ void send_message(int message_id, io_protocol *protocol)
     flag = msgsnd(message_id, (void *)&mesg, sizeof(io_protocol), 0);
 
     assert(flag != -1);
-    printf("message send sucess\n");
 }
 
 void receive_message(int message_id, io_protocol *protocol)
@@ -48,5 +47,4 @@ void receive_message(int message_id, io_protocol *protocol)
     flag = msgrcv(message_id, &mesg, sizeof(io_protocol), 1, 0);
     assert(flag != -1);
     *protocol = mesg.data;
-    printf("Message recv success: input_type=%d, value=%d\n", protocol->input_type, protocol->value);
 }

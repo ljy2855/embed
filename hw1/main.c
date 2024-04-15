@@ -74,6 +74,8 @@ void main_process()
     merge_result result;
     table temp;
     control_led(1,1,0);
+    print_fnd("0000");
+    print_lcd("PUT MODE","");
     while (1)
     {
         printf("cur mode : %d\n", mode);
@@ -227,7 +229,7 @@ void main_process()
                     run_motor();
                     result = merge();
                     sprintf(line1, "%d merged", result.cnt);
-                    sprintf(line2, "%s generated", result.filename);
+                    sprintf(line2, "%s", result.filename);
                     print_lcd(line1, line2);
                     // print result LCD
                     // TODO spin motor
@@ -245,10 +247,10 @@ void io_process()
     while (1)
     {
         key = read_input();
-        if (key == -1)
+        // scanf("%c%*c",&key);
+        if (key == 0)
             continue;
         io_data = preprocess_io(key);
-        printf("send\n");
         send_message(message_id, &io_data);
         if (io_data.input_type == READ_KEY && io_data.value == BACK)
             break;

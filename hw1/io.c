@@ -199,7 +199,7 @@ void init_device()
     assert(dev_motor >= 0);
     dev_lcd = open(FPGA_TEXT_LCD_DEVICE, O_WRONLY);
     assert(dev_lcd >= 0);
-    dev_readkey = open(FPGA_READKEY, O_RDONLY);
+    dev_readkey = open(FPGA_READKEY, O_RDONLY | O_NONBLOCK);
     assert(dev_readkey >= 0);
     dev_switch = open(FPGA_PUSH_SWITCH, O_RDWR);
     assert(dev_switch >= 0);
@@ -357,67 +357,81 @@ void kill_led()
         led_pid = 0; // Reset global PID
     }
 }
+bool has_one_second_elapsed(struct timeval start_time) {
+    struct timeval current_time;
+    gettimeofday(&current_time, NULL);
+    if (current_time.tv_sec - start_time.tv_sec >= 2) {
+        return true;
+    }
+    return false;
+}
+
 
 char read_input()
 {
+    struct timeval start_time;
     int ret;
-    int i;
+    int i,j;
     unsigned char push_sw_buff[MAX_BUTTON];
+    unsigned char dip_sw_buff = 0;  
     struct input_event ev[BUFF_SIZE];
     int size = sizeof(struct input_event);
 
-    ret = poll(input_fds, 3, -1); // 무한 대기
-    if (ret == -1)
+
+    if (read(dev_dip_switch, &dip_sw_buff, 1) > 0)
     {
-        printf("read fail\n");
+        if(!dip_sw_buff)
+            return 'R';
     }
 
-    for (i = 0; i < 3; i++)
+    if (read(dev_switch, &push_sw_buff, sizeof(push_sw_buff)) > 0)
     {
-        if (input_fds[i].revents & POLLIN)
+        for (j = 0; j < MAX_BUTTON; j++)
         {
-            switch (i)
-            {
-            case PRESS_SWITCH:
-                if (read(dev_switch, &push_sw_buff, sizeof(push_sw_buff)) > 0)
-                {
-                    for (int j = 0; j < MAX_BUTTON; j++)
-                    {
-                        if (push_sw_buff[j])
-                        {
-                            return '1' + j;
-                        }
-                    }
-                }
-                break;
 
-            case PRESS_READ_KEY:
-                if (read(dev_readkey, ev, size * BUFF_SIZE) > 0)
-                {
-                    if (ev[0].type == EV_KEY && ev[0].value == 1)
-                    { // Key press event
-                        switch (ev[0].code)
-                        {
-                        case KEY_BACK:
-                            return 'B';
-                        case KEY_VOLUMEUP:
-                            return '+';
-                        case KEY_VOLUMEDOWN:
-                            return '-';
-                        }
-                    }
+            if (push_sw_buff[j]) {
+                if (j == 3 && push_sw_buff[5]) {
+                    return 'D'; // Some specific command
                 }
-                break;
+                if (j == 0) {  // Assuming button '1' is at index 0
+                    gettimeofday(&start_time, NULL);
 
-            case PRESS_RESET:
-                if (read(dev_dip_switch, &push_sw_buff[0], 1) > 0)
-                {
-                    return 'R';
-                }
-                break;
+                    while(!has_one_second_elapsed(start_time)){
+                        read(dev_switch, &push_sw_buff, sizeof(push_sw_buff));
+                        if(push_sw_buff[0] == 0)
+                            return '1';
+                        usleep(10000);
+                    }
+                    return 'L';
+                    
+                } 
+                return '1' + j; // Immediate return for any button press
             }
         }
     }
+              
+    if (read(dev_readkey, ev, size * BUFF_SIZE) > 0)
+    {
+        if (ev[0].type == EV_KEY && ev[0].value == 1)
+        { // Key press event
+            switch (ev[0].code)
+            {
+            case KEY_BACK:
+                return 'B';
+            case KEY_VOLUMEUP:
+                return '+';
+            case KEY_VOLUMEDOWN:
+                return '-';
+            }
+        }
+    }
+          
 
-    return -1; // No input detected
+            
+    
+        
+    
+
+    usleep(10000);
+    return 0; // No input detected
 }
