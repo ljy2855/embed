@@ -77,11 +77,11 @@ void init_store()
     print_list();
 }
 
-void put_pair(int key, char *value)
+int put_pair(int key, char *value)
 {
     assert(memory_index < 3);
-
-    memory_table[memory_index].index = table_index++;
+    int index = table_index++;
+    memory_table[memory_index].index = index;
     memory_table[memory_index].key = key;
     strncpy(memory_table[memory_index].value, value, VALUE_BUFFER_SIZE);
 
@@ -91,6 +91,7 @@ void put_pair(int key, char *value)
     {
         flush();
     }
+    return index;
 }
 
 void flush()

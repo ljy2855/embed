@@ -4,7 +4,8 @@
 #include "io.h"
 #include <unistd.h>
 #include <stdio.h>
-
+#include <signal.h>
+#include <unistd.h>
 #define INITIAL_KEY "0000"
 #define INITIAL_VALUE ""
 
@@ -26,7 +27,7 @@ enum PUT_INPUT_MODE
     VALUE,
 };
 int message_id;
-int exit_sem;
+int merge_sem;
 struct databuf *buf1, *buf2;
 void io_process();
 void main_process();
@@ -41,7 +42,7 @@ int main(void)
     init_device();
     message_id = init_message_queue();
     sem_id = getsem(0);
-    exit_sem = getsem(0);
+    merge_sem = getsem(0);
     getseg(&buf1, &buf2);
 
     if (fork() == 0)
@@ -63,7 +64,7 @@ int main(void)
 void main_process()
 {
     char line1[17], line2[17];
-    int flag = 1;
+    int index = -1;
     io_protocol io_data;
     enum MODE mode = PUT;
     char key[5] = INITIAL_KEY;
@@ -72,7 +73,8 @@ void main_process()
     enum INPUT_MODE input_mode = ENG;
     merge_result result;
     table temp;
-    while (flag)
+    control_led(1,1,0);
+    while (1)
     {
         printf("cur mode : %d\n", mode);
         // TODO LCD OUTPUT
@@ -87,10 +89,11 @@ void main_process()
             if (storage_cnt() == 3)
             {
                 write_shm(sem_id, buf1, "M");
-                P(exit_sem);
+                P(merge_sem);
             }
             write_shm(sem_id, buf1, "B");
-
+            kill_led();
+            cleanup_device();
             break;
         }
         if (io_data.input_type == READ_KEY && io_data.value != PROG)
@@ -121,7 +124,9 @@ void main_process()
         switch (mode)
         {
         case PUT:
-
+            memset(line1, 0, 17);
+            memset(line2, 0, 17);
+            sprintf(line1, "PUT MODE");
             if (io_data.input_type == SWITCH && io_data.value == ONE_LONG)
             {
                 strcpy(key, INITIAL_KEY);
@@ -134,16 +139,22 @@ void main_process()
             {
                 if (strcmp(key, INITIAL_KEY) == 0 || strcmp(value, INITIAL_VALUE) == 0)
                     break;
-                put_pair(atoi(key), value);
+                index = put_pair(atoi(key), value);
+                sprintf(line2,"(%d, %s,%s)",index,key,value);
                 control_led(1, 1, 1);
                 if (storage_cnt() == 3)
                 {
                     write_shm(sem_id, buf1, "M");
+                    P(merge_sem);
                 }
             }
             else if (io_data.input_type == RESET)
             {
                 put_input_mode = (put_input_mode + 1) % 2;
+                if(put_input_mode == KEY)
+                    control_led(1 << 2, 1 << 3, 0); // 3,4 led twinkle
+                else
+                    control_led(1 << 6, 1 << 7, 0); // 7,8 led twinkle
             }
             else
             {
@@ -156,16 +167,19 @@ void main_process()
                         add_char_and_update(key, io_data.value + '0');
                         printf("update key : %s\n", key);
                     }
-                    control_led(1 << 2, 1 << 3, 0); // 3,4 led twinkle
+                    control_led(1 << 2, 1 << 3, 0);
+                    
                 }
                 else
                 {
                     process_value(value, io_data.value);
                     printf("update value : %s\n", value);
-                    control_led(1 << 6, 1 << 7, 0); // 7,8 led twinkle
+                    
                 }
+                sprintf(line2,"%s",value);
             }
             print_fnd(key);
+            print_lcd(line1,line2);
 
             break;
         case GET:
@@ -230,15 +244,17 @@ void io_process()
     io_protocol io_data;
     while (1)
     {
-        scanf("%c%*c", &key);
-        if (key == '\n')
+        key = read_input();
+        if (key == -1)
             continue;
         io_data = preprocess_io(key);
         printf("send\n");
         send_message(message_id, &io_data);
         if (io_data.input_type == READ_KEY && io_data.value == BACK)
             break;
+        usleep(500000);
     }
+    cleanup_device();
 }
 
 void merge_process()
@@ -253,11 +269,12 @@ void merge_process()
             printf("Background merge start\n");
             run_motor();
             merge();
-            V(exit_sem);
+            V(merge_sem);
         }
 
         if (message[0] == 'B')
         {
+            cleanup_device();
             exit(0);
         }
     }

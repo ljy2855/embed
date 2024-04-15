@@ -43,6 +43,6 @@ void init_store();
 table get_pair(int key);
 merge_result merge();
 void flush();
-void put_pair(int key, char *value);
+int put_pair(int key, char *value);
 int storage_cnt();
 void print_list();
