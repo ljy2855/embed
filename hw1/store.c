@@ -291,6 +291,7 @@ static table search_storage(FILE *fp, const int search_key)
                     token = strtok(NULL, " ");
                     if (token)
                     {
+                        token[strlen(token) - 1] = 0;
                         strncpy(result.value, token, VALUE_BUFFER_SIZE - 1);
                         result.value[VALUE_BUFFER_SIZE - 1] = '\0'; // 널 문자 보장
                     }
