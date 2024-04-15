@@ -8,6 +8,10 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <poll.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 
 #define MAX_LENGTH 5
 #define FPGA_STEP_MOTOR_DEVICE "/dev/fpga_step_motor"
@@ -17,8 +21,8 @@
 #define FND_DEVICE "/dev/fpga_fnd"
 #define FPGA_DIP_SWITCH "/dev/fpga_dip_switch"
 
-#define FPGA_BASE_ADDRESS 0x08000000 //fpga_base address
-#define LED_ADDR 0x16 
+#define FPGA_BASE_ADDRESS 0x08000000 // fpga_base address
+#define LED_ADDR 0x16
 #define MAX_BUFF 32
 #define LINE_BUFF 16
 int dev_motor;
@@ -29,9 +33,11 @@ int dev_fnd;
 int dev_dip_switch;
 int led_fd;
 
-pid_t led_pid;
+pid_t led_pid = 0;
+;
 
-enum input_type{
+enum input_type
+{
     PRESS_SWITCH,
     PRESS_READ_KEY,
     PRESS_RESET,
@@ -39,7 +45,7 @@ enum input_type{
 
 struct pollfd input_fds[3];
 
-unsigned char *led_addr =0;
+unsigned char *led_addr = 0;
 
 io_protocol preprocess_io(char key)
 {
@@ -163,10 +169,9 @@ void process_value(char *current_input, int key)
             if (last_key == key && len > 0)
             {
                 // 같은 키를 눌렀다면, 순환
-                
-                    press_count = (press_count + 1) % strlen(key_map[key]);
-                    current_input[len - 1] = key_map[key][press_count]; // 마지막 문자 업데이트
-               
+
+                press_count = (press_count + 1) % strlen(key_map[key]);
+                current_input[len - 1] = key_map[key][press_count]; // 마지막 문자 업데이트
             }
             else
             {
@@ -185,20 +190,20 @@ void process_value(char *current_input, int key)
 
 void init_device()
 {
-  
+
     unsigned long *fpga_addr = 0;
     // init device driver
     dev_motor = open(FPGA_STEP_MOTOR_DEVICE, O_WRONLY);
     assert(dev_motor >= 0);
     dev_lcd = open(FPGA_TEXT_LCD_DEVICE, O_WRONLY);
     assert(dev_lcd >= 0);
-    dev_readkey =  open(FPGA_READKEY,O_RDONLY);
+    dev_readkey = open(FPGA_READKEY, O_RDONLY);
     assert(dev_readkey >= 0);
-    dev_switch = open(FPGA_PUSH_SWITCH,O_RDWR);
+    dev_switch = open(FPGA_PUSH_SWITCH, O_RDWR);
     assert(dev_switch >= 0);
-    dev_fnd = open(FND_DEVICE,O_RDWR);
+    dev_fnd = open(FND_DEVICE, O_RDWR);
     assert(dev_fnd >= 0);
-    dev_dip_switch = open(FPGA_DIP_SWITCH,O_RDWR);
+    dev_dip_switch = open(FPGA_DIP_SWITCH, O_RDWR);
     assert(dev_dip_switch >= 0);
 
     input_fds[SWITCH].fd = dev_switch;
@@ -210,78 +215,127 @@ void init_device()
 
     // init led mmap
     led_fd = open("/dev/mem", O_RDWR | O_SYNC);
-	if (led_fd < 0) {
-		perror("/dev/mem open error");
-		
-	}
+    if (led_fd < 0)
+    {
+        perror("/dev/mem open error");
+    }
 
-	fpga_addr = (unsigned long *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, led_fd, FPGA_BASE_ADDRESS);
-	if (fpga_addr == MAP_FAILED)
-	{
-		printf("mmap error!\n");
-		close(led_fd);
-		
-	}
-	
-	led_addr=(unsigned char*)((void*)fpga_addr+LED_ADDR);
+    fpga_addr = (unsigned long *)mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, led_fd, FPGA_BASE_ADDRESS);
+    if (fpga_addr == MAP_FAILED)
+    {
+        printf("mmap error!\n");
+        close(led_fd);
+    }
+
+    led_addr = (unsigned char *)((void *)fpga_addr + LED_ADDR);
 }
 
-void run_motor(){
+void run_motor()
+{
     unsigned char motor_state[3];
-    memset(motor_state,0,sizeof(motor_state));
-    motor_state[0] =1; // start
-    motor_state[2] =10; // set speed
-    write(dev_motor,motor_state,3);
+    memset(motor_state, 0, sizeof(motor_state));
+    motor_state[0] = 1;  // start
+    motor_state[2] = 10; // set speed
+    write(dev_motor, motor_state, 3);
     sleep(1);
-    motor_state[0] =0;
-    write(dev_motor,motor_state,3);
+    motor_state[0] = 0;
+    write(dev_motor, motor_state, 3);
 }
 
-void print_fnd(char * value){
+void print_fnd(char *value)
+{
     unsigned char data[4];
     int i;
-    for(i = 0 ; i < 4 ; i++)
-        data[i] = value[i] -'0';
-    write(dev_fnd,&data,4);
+    for (i = 0; i < 4; i++)
+        data[i] = value[i] - '0';
+    write(dev_fnd, &data, 4);
 }
 
-void print_lcd(char * line1, char * line2){
+void print_lcd(char *line1, char *line2)
+{
     unsigned char string[32];
     int str_size;
-    memset(string,0,sizeof(string));
-    str_size=strlen(line1);
-	if(str_size>0) {
-		strncat(string,line1,str_size);
-		memset(string+str_size,' ',LINE_BUFF-str_size);
-	}
+    memset(string, 0, sizeof(string));
+    str_size = strlen(line1);
+    if (str_size > 0)
+    {
+        strncat(string, line1, str_size);
+        memset(string + str_size, ' ', LINE_BUFF - str_size);
+    }
 
-	str_size=strlen(line2);
-	if(str_size>0) {
-		strncat(string,line2,str_size);
-		memset(string+LINE_BUFF+str_size,' ',LINE_BUFF-str_size);
-	}
-    write(dev_lcd,string,MAX_BUFF);	
+    str_size = strlen(line2);
+    if (str_size > 0)
+    {
+        strncat(string, line2, str_size);
+        memset(string + LINE_BUFF + str_size, ' ', LINE_BUFF - str_size);
+    }
+    write(dev_lcd, string, MAX_BUFF);
 }
 
+void control_led(unsigned char led1, unsigned char led2, unsigned char all)
+{
+    if (led_pid != 0)
+    {
+        if (kill(led_pid, 0) == 0)
+        {                              // Check if the process exists
+            kill(led_pid, SIGKILL);    // Terminate the existing process
+            waitpid(led_pid, NULL, 0); // Ensure the process is cleaned up
+            printf("Killed existing process with PID %d\n", led_pid);
+        }
+        led_pid = 0; // Reset global PID
+    }
 
+    led_pid = fork();
+    if (led_pid == 0)
+    { // Child process
+        if (all)
+        {
+            *led_addr = 0xff;
+            usleep(500000);
+            *led_addr = 0;
+        }
+        while (1)
+        {
+            *led_addr = led1;
+            usleep(500000); // 500 milliseconds
+            *led_addr = led2;
+            usleep(500000); // 500 milliseconds
+        }
 
-int read_input(){
+        exit(0);
+    }
+    else if (led_pid > 0)
+    { // Parent process
+        printf("Started blinking process with PID %d\n", led_pid);
+    }
+    else
+    {
+        perror("Failed to fork");
+        exit(1);
+    }
+}
+
+int read_input()
+{
     int ret;
     int i;
     ssize_t count;
     ret = poll(input_fds, 3, -1); // 무한 대기
-    if (ret == -1) {
+    if (ret == -1)
+    {
         // handle_error("poll failed");
     }
 
-    for (i = 0; i < 3; i++) {
-        if (input_fds[i].revents & POLLIN) {
+    for (i = 0; i < 3; i++)
+    {
+        if (input_fds[i].revents & POLLIN)
+        {
             switch (i)
             {
             case PRESS_SWITCH:
                 /* code */
                 break;
-            
+
             case PRESS_READ_KEY:
                 /* code */
                 break;
@@ -290,12 +344,12 @@ int read_input(){
                 break;
             }
             // ssize_t count = read(input_fds[i].fd, buffer, BUFFER_SIZE - 1);
-            if (count == -1) {
+            if (count == -1)
+            {
                 // handle_error("read failed");
             }
         }
     }
-  
 
     return 0;
 }

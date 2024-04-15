@@ -82,7 +82,7 @@ void main_process()
         {
             // terminate program
             // TODO flush memory to storage
-            
+
             flush();
             if (storage_cnt() == 3)
             {
@@ -90,7 +90,7 @@ void main_process()
                 P(exit_sem);
             }
             write_shm(sem_id, buf1, "B");
-            
+
             break;
         }
         if (io_data.input_type == READ_KEY && io_data.value != PROG)
@@ -108,12 +108,19 @@ void main_process()
                 if (--mode == -1)
                     mode = MERGE;
             }
+            if (mode == GET)
+            {
+                control_led(1 << 4, 1 << 4, 0); // turn on led 5
+            }
+            else if (mode == PUT)
+            {
+                control_led(1, 1, 0); // turn on led 1
+            }
             continue;
         }
         switch (mode)
         {
         case PUT:
-            
 
             if (io_data.input_type == SWITCH && io_data.value == ONE_LONG)
             {
@@ -121,12 +128,14 @@ void main_process()
                 strcpy(value, INITIAL_VALUE);
                 put_input_mode = KEY;
                 input_mode = ENG;
+                control_led(1, 1, 0); // turn on led 1
             }
             else if (io_data.input_type == SWITCH && io_data.value == FOUR_SIX)
             {
                 if (strcmp(key, INITIAL_KEY) == 0 || strcmp(value, INITIAL_VALUE) == 0)
                     break;
                 put_pair(atoi(key), value);
+                control_led(1, 1, 1);
                 if (storage_cnt() == 3)
                 {
                     write_shm(sem_id, buf1, "M");
@@ -147,20 +156,22 @@ void main_process()
                         add_char_and_update(key, io_data.value + '0');
                         printf("update key : %s\n", key);
                     }
+                    control_led(1 << 2, 1 << 3, 0); // 3,4 led twinkle
                 }
                 else
                 {
                     process_value(value, io_data.value);
                     printf("update value : %s\n", value);
+                    control_led(1 << 6, 1 << 7, 0); // 7,8 led twinkle
                 }
             }
             print_fnd(key);
 
             break;
         case GET:
-            memset(line1,0,17);
-            memset(line2,0,17);
-            sprintf(line1,"GET MODE");
+            memset(line1, 0, 17);
+            memset(line2, 0, 17);
+            sprintf(line1, "GET MODE");
             if (io_data.input_type == SWITCH)
             {
                 if (io_data.value <= NINE)
@@ -168,6 +179,7 @@ void main_process()
                     add_char_and_update(key, io_data.value + '0');
                 }
                 printf("cur key: %s\n", key);
+                control_led(1 << 2, 1 << 3, 0);
             }
             if (io_data.input_type == RESET)
             {
@@ -179,18 +191,18 @@ void main_process()
                 if (temp.index == NOT_FOUND)
                 {
                     // TODO PRINT ERROR
-                    sprintf(line2,"Error");
-
+                    sprintf(line2, "Error");
                 }
                 else
                 {
                     // TODO PRINT OUTPUT
-                    sprintf(line2,"(%d, %d,%s)",temp.index,temp.key,temp.value);
+                    sprintf(line2, "(%d, %d,%s)", temp.index, temp.key, temp.value);
                     printf("[%d] %d %s\n", temp.index, temp.key, temp.value);
                 }
+                control_led(1 << 4, 1 << 4, 1);
             }
             print_fnd(key);
-            print_lcd(line1,line2);
+            print_lcd(line1, line2);
 
             break;
         case MERGE:
@@ -200,9 +212,9 @@ void main_process()
                 {
                     run_motor();
                     result = merge();
-                    sprintf(line1,"%d merged",result.cnt);
-                    sprintf(line2,"%s generated",result.filename);
-                    print_lcd(line1,line2);
+                    sprintf(line1, "%d merged", result.cnt);
+                    sprintf(line2, "%s generated", result.filename);
+                    print_lcd(line1, line2);
                     // print result LCD
                     // TODO spin motor
                 }
