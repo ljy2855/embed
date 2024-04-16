@@ -13,7 +13,16 @@ struct msgbuf
     long mtype;
     io_protocol data;
 };
-
+/**
+ * initalize message queue and return key
+ */
 int init_message_queue();
+/**
+ * read queue and return io_protocol data
+ */
 void receive_message(int message_id, io_protocol *protocol);
+
+/**
+ * write queue with io_protocol data
+ */
 void send_message(int message_id, io_protocol *protocol);

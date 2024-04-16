@@ -39,10 +39,31 @@ typedef struct merge_result
     char filename[20];
 } merge_result;
 
+/**
+ * initalize key value store and load exist storage table
+ */
 void init_store();
+/**
+ * search key value pair with key by recently
+ */
 table get_pair(int key);
+/**
+ * merge storage table
+ */
 merge_result merge();
+/**
+ * export memory table to storage table
+ */
 void flush();
+/**
+ * insert new key value pair in memory table
+ */
 int put_pair(int key, char *value);
+/**
+ * get current storage table count
+ */
 int storage_cnt();
+/**
+ * print storage tables meta data list
+ */
 void print_list();

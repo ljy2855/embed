@@ -30,12 +30,29 @@ typedef union semun
 
 static int shm_id1, shm_id2, sem_id;
 
+/**
+ * initalize two shared memory
+ */
 void getseg(struct databuf **p1, struct databuf **p2);
+/**
+ * get semaphore and return id
+ */
 int getsem(int val);
+/**
+ * lock with semaphore
+ */
 void P(int sem_id);
+/**
+ * unlock with semaphore
+ */
 void V(int sem_id);
-void remobj(void);
+/**
+ * write shared memory data
+ */
 void write_shm(int semid, struct databuf *buf, char *data);
+/**
+ * read shared memory data
+ */
 void read_shm(int semid, struct databuf *buf, char *data);
 
 #endif

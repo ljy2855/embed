@@ -6,11 +6,11 @@ int init_message_queue()
     int msgid;
     key = ftok("keyfile", 1);
 
-    // 동일한 키를 가진 메시지 큐가 이미 존재하는지 확인
+    // check message queue exist
     msgid = msgget(key, IPC_CREAT | 0666);
     assert(msgid != -1);
 
-    // 메시지 큐가 이미 존재한다면, 삭제
+    // remove prior message queue
     if (msgid > -1)
     {
         if (msgctl(msgid, IPC_RMID, NULL) == -1)
@@ -20,7 +20,7 @@ int init_message_queue()
         }
     }
 
-    // 새로운 메시지 큐 생성
+    // generate new message queue
     msgid = msgget(key, IPC_CREAT | 0666);
     assert(msgid != -1);
 

@@ -27,6 +27,9 @@ static void popleft(storage_list *list);
 const char *shm_name = "/my_shared_memory";
 const int shm_size = sizeof(storage_list) + META_LIST_CNT * sizeof(storage_meta);
 
+/**
+ * init shared memory in main process, merge process
+ */
 storage_list *init_shared_memory()
 {
     int shm_fd = shm_open(shm_name, O_RDWR, 0666);
@@ -66,7 +69,6 @@ storage_list *init_shared_memory()
     return (storage_list *)mapped;
 }
 
-// KVS interface
 void init_store()
 {
     meta_list = init_shared_memory();
@@ -149,7 +151,6 @@ table get_pair(int key)
     return target;
 }
 
-// TODO background running job
 merge_result merge()
 {
     table temp[MAX_SIZE];
@@ -210,6 +211,10 @@ merge_result merge()
 }
 
 // helpers
+
+/**
+ * load storage table files
+ */
 static void load_storage()
 {
     DIR *dir;
@@ -234,6 +239,9 @@ static void load_storage()
     closedir(dir);
 }
 
+/**
+ * search key value pair in storage tables
+ */
 static table search_storage(FILE *fp, const int search_key)
 {
     char buffer[1024];
@@ -241,29 +249,27 @@ static table search_storage(FILE *fp, const int search_key)
     char *token;
     table result = {NOT_FOUND, 0, ""};
 
-    // 파일의 끝으로 이동하여 전체 크기를 측정
+    // get file size
     fseek(fp, 0, SEEK_END);
-    long last_pos = ftell(fp); // 파일 크기를 저장
+    long last_pos = ftell(fp);
 
-    // 파일의 끝에서 한 줄씩 역순으로 읽기 시작
+    // search pair reverse
     pos = last_pos;
     while (pos > 0)
     {
         long line_start = pos;
 
-        // 줄의 시작 위치를 찾기
         while (pos > 0)
         {
             fseek(fp, --pos, SEEK_SET);
             char c = fgetc(fp);
             if (c == '\n' && pos != last_pos - 1)
-            { // 파일 끝 바로 다음 개행 제외
+            {
                 line_start = pos + 1;
                 break;
             }
         }
 
-        // 파일 시작 위치에 도달하면, 줄 시작을 파일 시작으로 설정
         if (pos == 0)
         {
             fseek(fp, 0, SEEK_SET);
@@ -274,9 +280,9 @@ static table search_storage(FILE *fp, const int search_key)
         }
 
         if (fgets(buffer, sizeof(buffer), fp) == NULL)
-            break; // 파일 시작에 도달하거나 읽기 오류 발생
+            break; // arrive file pos start
 
-        // 버퍼에서 데이터 토큰화
+        // get key value pair
         token = strtok(buffer, " ");
         if (token != NULL)
         {
@@ -301,20 +307,24 @@ static table search_storage(FILE *fp, const int search_key)
             }
         }
 
-        // 다음 줄을 위해 위치 갱신
+        // next line
         pos = line_start - 1;
     }
 
     return result;
 }
-
+/**
+ * compare pair with key
+ */
 int compare_key(const void *a, const void *b)
 {
     table *tableA = (table *)a;
     table *tableB = (table *)b;
     return (tableA->key - tableB->key);
 }
-
+/**
+ * remove duplicate key pairs
+ */
 static void remove_duplicates(table *temp, int *table_cnt)
 {
     int write_pos = 0;
@@ -331,11 +341,17 @@ static void remove_duplicates(table *temp, int *table_cnt)
     *table_cnt = write_pos;
 }
 
+/**
+ * sort by table's key
+ */
 static void sort_by_key(table *temp, int table_cnt)
 {
     qsort(temp, table_cnt, sizeof(table), compare_key);
 }
 
+/**
+ * allocate new index
+ */
 static void reindex(table *temp, int table_cnt)
 {
     int i;
@@ -347,14 +363,17 @@ static void reindex(table *temp, int table_cnt)
 
 // List structure method
 
+/**
+ * insert new storage table meta data node
+ */
 static void insert_node(storage_list *list, int index, char *filename)
 {
-    storage_meta *newNode = (storage_meta *)(list + 1); // 가정: storage_meta 배열이 storage_list 바로 뒤에 위치
+    storage_meta *newNode = (storage_meta *)(list + 1); // get head node
     int i;
     for (i = 0; i < META_LIST_CNT; i++)
     {
         if (newNode[i].index == 0)
-        { // 미사용 노드 찾기
+        { // find empty node in memory block
             newNode[i].index = index;
             strcpy(newNode[i].filename, filename);
             newNode[i].next = newNode[i].prev = NULL;
@@ -412,38 +431,38 @@ int storage_cnt()
     }
     return cnt;
 }
-
+/**
+ * pop node from head
+ */
 static void popleft(storage_list *list)
 {
     if (list->head == NULL)
     {
-        return; // 리스트가 비어있는 경우
+        // list is empty
+        return;
     }
 
     storage_meta *temp = list->head;
     printf("remove file : %s index: %d\n", temp->filename, temp->index);
-    // 리스트의 head를 다음 노드로 이동
+
     list->head = list->head->next;
 
     if (list->head)
     {
-        list->head->prev = NULL; // 새 head의 prev를 NULL로 설정
+        list->head->prev = NULL;
     }
     else
     {
-        list->tail = NULL; // 리스트가 비었으면 tail도 NULL로 설정
+        list->tail = NULL;
     }
 
-    // 파일 관련 리소스 정리
     remove(temp->filename);
 
-    // 파일 삭제
-
-    // 노드 초기화 및 사용하지 않는 것으로 표시
-    temp->index = 0; // index를 0으로 설정하여 미사용으로 표시
+    // remove node data
+    temp->index = 0;
     temp->next = NULL;
     temp->prev = NULL;
-    memset(temp->filename, 0, sizeof(temp->filename)); // 파일 이름 초기화
+    memset(temp->filename, 0, sizeof(temp->filename));
 }
 
 void print_list()

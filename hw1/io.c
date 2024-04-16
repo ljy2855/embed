@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <poll.h>
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -28,6 +27,8 @@
 #define LINE_BUFF 16
 #define MAX_BUTTON 9
 #define BUFF_SIZE 64
+
+// device driver fds
 int dev_motor;
 int dev_lcd;
 int dev_readkey;
@@ -35,9 +36,10 @@ int dev_switch;
 int dev_fnd;
 int dev_dip_switch;
 int led_fd;
-unsigned long *fpga_addr = 0;
 
-pid_t led_pid = 0;
+unsigned long *fpga_addr = 0; // mmap address to control led device
+unsigned char *led_addr = 0;  // led mmap address
+pid_t led_pid = 0;            // store current led process
 
 enum input_type
 {
@@ -46,14 +48,10 @@ enum input_type
     PRESS_RESET,
 };
 
-struct pollfd input_fds[3];
-
-unsigned char *led_addr = 0;
-
 io_protocol preprocess_io(char key)
 {
     io_protocol io_data;
-    switch (key) // TODO change
+    switch (key)
     {
     case '1':
         io_data.input_type = SWITCH;
@@ -120,11 +118,7 @@ io_protocol preprocess_io(char key)
     return io_data;
 }
 
-bool num_mode = true; // 숫자 모드인지 확인 (true면 숫자, false면 문자)
-int last_key = 0;     // 마지막으로 누른 키 저장
-int press_count = 0;  // 같은 키를 연속으로 누른 횟수
-
-// 문자 모드에서 각 키에 해당하는 문자 순환을 위한 정보
+// number pad mapping
 char key_map[10][4] = {
     "",     // 0
     "",     // 1
@@ -140,54 +134,57 @@ char key_map[10][4] = {
 
 void process_value(char *current_input, int key)
 {
+    static bool num_mode = true;
+    static int last_key = 0;
+    static int press_count = 0;
     int len = strlen(current_input);
 
     if (key == 1)
     {
-        num_mode = !num_mode; // 모드 전환
-        last_key = 0;         // 키 정보 초기화
-        press_count = 0;      // 키 누르기 횟수 초기화
-        return;               // 모드 전환 키는 문자를 추가하지 않음
+        num_mode = !num_mode; // convert input mode
+        last_key = 0;         // init last key
+        press_count = 0;      // init press cnt
+        return;
     }
 
     if (num_mode)
     {
-        // 숫자 모드일 때
+        // input number
         if (key >= 2 && key <= 9)
         {
             if (len < MAX_LENGTH)
             {
-                current_input[len] = '0' + key; // 숫자 입력
-                current_input[len + 1] = '\0';  // 문자열 종료
+                current_input[len] = '0' + key;
+                current_input[len + 1] = '\0';
             }
         }
-        last_key = 0;    // 키 정보 초기화
-        press_count = 0; // 키 누르기 횟수 초기화
+        last_key = 0;
+        press_count = 0;
     }
     else
     {
-        // 문자 모드일 때
+        // input character
         if (key >= 2 && key <= 9)
         {
             if (last_key == key && len > 0)
             {
-                // 같은 키를 눌렀다면, 순환
+                // circulate next character
 
                 press_count = (press_count + 1) % strlen(key_map[key]);
-                current_input[len - 1] = key_map[key][press_count]; // 마지막 문자 업데이트
+                current_input[len - 1] = key_map[key][press_count];
             }
             else
             {
-                // 다른 키를 처음 눌렀다면 또는 문자열 길이가 0일 때
+                // new character input
                 if (len < MAX_LENGTH)
                 {
-                    current_input[len] = key_map[key][0]; // 첫 문자 입력
-                    current_input[len + 1] = '\0';        // 문자열 종료
-                    press_count = 0;                      // 키 누르기 횟수 초기화
+                    current_input[len] = key_map[key][0];
+                    current_input[len + 1] = '\0';
+                    press_count = 0;
                 }
             }
         }
-        last_key = key; // 현재 키 업데이트
+        last_key = key;
     }
 }
 
@@ -208,13 +205,6 @@ void init_device()
     dev_dip_switch = open(FPGA_DIP_SWITCH, O_RDWR);
     assert(dev_dip_switch >= 0);
 
-    input_fds[SWITCH].fd = dev_switch;
-    input_fds[SWITCH].events = POLLIN;
-    input_fds[READ_KEY].fd = dev_readkey;
-    input_fds[READ_KEY].events = POLLIN;
-    input_fds[RESET].fd = dev_dip_switch;
-    input_fds[RESET].events = POLLIN;
-
     // init led mmap
     led_fd = open("/dev/mem", O_RDWR | O_SYNC);
     if (led_fd < 0)
@@ -234,7 +224,7 @@ void init_device()
 
 void cleanup_device()
 {
-    // 닫을 디바이스 핸들
+    // close device fd
     if (dev_motor >= 0)
         close(dev_motor);
     if (dev_lcd >= 0)
@@ -248,7 +238,7 @@ void cleanup_device()
     if (dev_dip_switch >= 0)
         close(dev_dip_switch);
 
-    // 메모리 매핑 해제
+    // munmap
     if (fpga_addr != MAP_FAILED)
     {
         if (munmap((void *)fpga_addr, 4096) == -1)
@@ -257,7 +247,7 @@ void cleanup_device()
         }
     }
 
-    // 메모리 디바이스 파일 닫기
+    // close led fd
     if (led_fd >= 0)
         close(led_fd);
 }
@@ -270,7 +260,7 @@ void run_motor()
     motor_state[2] = 10; // set speed
     write(dev_motor, motor_state, 3);
     sleep(1);
-    motor_state[0] = 0;
+    motor_state[0] = 0; // stop
     write(dev_motor, motor_state, 3);
 }
 
@@ -357,59 +347,67 @@ void kill_led()
         led_pid = 0; // Reset global PID
     }
 }
-bool has_one_second_elapsed(struct timeval start_time) {
+/**
+ * Check start_time over 1 sec
+ */
+bool has_one_second_elapsed(struct timeval start_time)
+{
     struct timeval current_time;
     gettimeofday(&current_time, NULL);
-    if (current_time.tv_sec - start_time.tv_sec >= 2) {
+    if (current_time.tv_sec - start_time.tv_sec >= 2)
+    {
         return true;
     }
     return false;
 }
 
-
 char read_input()
 {
     struct timeval start_time;
     int ret;
-    int i,j;
+    int i, j;
     unsigned char push_sw_buff[MAX_BUTTON];
-    unsigned char dip_sw_buff = 0;  
+    unsigned char dip_sw_buff = 0;
     struct input_event ev[BUFF_SIZE];
     int size = sizeof(struct input_event);
 
-
+    // get reset button
     if (read(dev_dip_switch, &dip_sw_buff, 1) > 0)
     {
-        if(!dip_sw_buff)
+        if (!dip_sw_buff)
             return 'R';
     }
-
+    // get switch input
     if (read(dev_switch, &push_sw_buff, sizeof(push_sw_buff)) > 0)
     {
         for (j = 0; j < MAX_BUTTON; j++)
         {
 
-            if (push_sw_buff[j]) {
-                if (j == 3 && push_sw_buff[5]) {
+            if (push_sw_buff[j])
+            {
+                if (j == 3 && push_sw_buff[5])
+                {
                     return 'D'; // Some specific command
                 }
-                if (j == 0) {  // Assuming button '1' is at index 0
+                if (j == 0)
+                { // Assuming button '1' is at index 0
                     gettimeofday(&start_time, NULL);
 
-                    while(!has_one_second_elapsed(start_time)){
+                    while (!has_one_second_elapsed(start_time))
+                    {
                         read(dev_switch, &push_sw_buff, sizeof(push_sw_buff));
-                        if(push_sw_buff[0] == 0)
+                        if (push_sw_buff[0] == 0)
                             return '1';
                         usleep(10000);
                     }
                     return 'L';
-                    
-                } 
+                }
                 return '1' + j; // Immediate return for any button press
             }
         }
     }
-              
+
+    // get read_key input
     if (read(dev_readkey, ev, size * BUFF_SIZE) > 0)
     {
         if (ev[0].type == EV_KEY && ev[0].value == 1)
@@ -425,12 +423,6 @@ char read_input()
             }
         }
     }
-          
-
-            
-    
-        
-    
 
     usleep(10000);
     return 0; // No input detected
