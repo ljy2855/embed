@@ -1,0 +1,6 @@
+echo armset
+
+read var
+arm-none-linux-gnueabi-gcc -static -Wall -o $var $var.c
+
+cp $var /tftpboot/
