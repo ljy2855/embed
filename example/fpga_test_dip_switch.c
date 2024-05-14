@@ -1,43 +1,39 @@
-/* FPGA DIP Switch Test Application
-File : fpga_test_dip.c
-Auth : largest@huins.com */
-
-#include <stdio.h> 
-#include <stdlib.h> 
-#include <unistd.h> 
-#include <sys/types.h> 
-#include <sys/stat.h> 
-#include <fcntl.h> 
-#include <sys/ioctl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <signal.h>
 
-unsigned char quit = 0;
+volatile sig_atomic_t quit = 0;
 
-void user_signal1(int sig) 
-{
-	quit = 1;
+void user_signal1(int sig) {
+    quit = 1;
 }
 
-int main(void)
-{
-	int dev;
-	unsigned char dip_sw_buff = 0;  
+int main(void) {
+    int dev;
+    unsigned char dip_sw_buff = 0;
 
-	dev = open("/dev/fpga_dip_switch", O_RDWR);
+    dev = open("/dev/fpga_dip_switch", O_RDONLY);
+    if (dev < 0) {
+        perror("Device open error");
+        return -1;
+    }
 
-	if (dev<0){
-		printf("Device Open Error\n");
-		close(dev);
-		return -1;
-	}
+    // Ensure the file is set to blocking mode
+    int flags = fcntl(dev, F_GETFL, 0);
+    fcntl(dev, F_SETFL, flags & ~O_NONBLOCK);
 
-	(void)signal(SIGINT, user_signal1);
+    signal(SIGINT, user_signal1);
+    printf("Press <ctrl+c> to quit. \n");
 
-	printf("Press <ctrl+c> to quit. \n");
-	while(!quit){
-		usleep(400000);
-		read(dev, &dip_sw_buff, 1);
-		printf("Read dip switch: 0x%02X \n", dip_sw_buff);
-	}
-	close(dev);
+    while(!quit) {
+        usleep(400000);
+        if (read(dev, &dip_sw_buff, 1) > 0) {
+            printf("Read dip switch: 0x%02X \n", dip_sw_buff);
+        }
+    }
+
+    close(dev);
+    return 0;
 }

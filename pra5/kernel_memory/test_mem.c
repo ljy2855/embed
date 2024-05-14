@@ -42,7 +42,7 @@ int main(int argc, char **argv)
 	write(fd, &input, request_size);
 	printf("Request Size : %lu, Diff System Memory: %llu \n", SIZE, memory_size - get_system_memory());
 
-	off_t loc = lseek(fd, 0, SEEK_SET);
+	loc = lseek(fd, 0, SEEK_SET);
 	read(fd, &output, request_size);
 	close(fd);
 	return 0;

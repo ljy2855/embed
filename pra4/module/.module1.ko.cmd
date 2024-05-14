@@ -1,0 +1,1 @@
+cmd_/home/embe2024/Downloads/workspace/pra4/module/module1.ko := arm-none-linux-gnueabi-ld -EL -r  -T /work/achroimx_kernel/scripts/module-common.lds --build-id  -o /home/embe2024/Downloads/workspace/pra4/module/module1.ko /home/embe2024/Downloads/workspace/pra4/module/module1.o /home/embe2024/Downloads/workspace/pra4/module/module1.mod.o

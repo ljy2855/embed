@@ -1,6 +1,7 @@
 #include "io.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
 #include <fcntl.h>
@@ -273,24 +274,35 @@ void print_fnd(char *value)
     write(dev_fnd, &data, 4);
 }
 
-void print_lcd(char *line1, char *line2)
+void print_lcd(char line1[], char line2[])
 {
     unsigned char string[32];
     int str_size;
     memset(string, 0, sizeof(string));
-    str_size = strlen(line1);
+    
+    char copy_line1[17], copy_line2[17];
+    strcpy(copy_line1,line1);
+    strcpy(copy_line2,line2);
+
+    if(strlen(copy_line1)>LINE_BUFF||strlen(copy_line2)>LINE_BUFF)
+	{
+		assert(0);
+	}
+
+    str_size = strlen(copy_line1);
     if (str_size > 0)
     {
-        strncat(string, line1, str_size);
+        strncat(string, copy_line1, str_size);
         memset(string + str_size, ' ', LINE_BUFF - str_size);
     }
 
-    str_size = strlen(line2);
+    str_size = strlen(copy_line2);
     if (str_size > 0)
     {
-        strncat(string, line2, str_size);
+        strncat(string, copy_line2, str_size);
         memset(string + LINE_BUFF + str_size, ' ', LINE_BUFF - str_size);
     }
+    printf("%s\n",string);
     write(dev_lcd, string, MAX_BUFF);
 }
 
@@ -303,6 +315,7 @@ void control_led(unsigned char led1, unsigned char led2, unsigned char all)
             kill(led_pid, SIGKILL);    // Terminate the existing process
             waitpid(led_pid, NULL, 0); // Ensure the process is cleaned up
             printf("Killed existing process with PID %d\n", led_pid);
+            usleep(100000);
         }
         led_pid = 0; // Reset global PID
     }
@@ -312,6 +325,7 @@ void control_led(unsigned char led1, unsigned char led2, unsigned char all)
     { // Child process
         if (all)
         {
+            usleep(500000);
             *led_addr = 0xff;
             usleep(500000);
             *led_addr = 0;
@@ -323,7 +337,7 @@ void control_led(unsigned char led1, unsigned char led2, unsigned char all)
             *led_addr = 128 / led2;
             usleep(500000); // 500 milliseconds
         }
-        return;
+        exit(0);
     }
     else if (led_pid > 0)
     { // Parent process

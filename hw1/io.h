@@ -34,7 +34,7 @@ void print_fnd(char *value);
 /**
  * control lcd display interface
  */
-void print_lcd(char *line1, char *line2);
+void print_lcd(char line1[], char line2[]);
 
 /**
  * control led display interface

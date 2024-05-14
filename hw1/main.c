@@ -70,7 +70,9 @@ int main(void)
  */
 void main_process()
 {
-    char line1[17], line2[17];
+    char line1[17] = "";
+    char line2[17] = "";
+    char temp1[17], temp2[17];
     int index = -1;
     io_protocol io_data;
     enum MODE mode = PUT;
@@ -84,9 +86,10 @@ void main_process()
     // init device output
     control_led(1, 1, 0);
     print_fnd("0000");
-    print_lcd("PUT MODE", "");
+    sprintf(line1,"PUT MODE");
     while (1)
     {
+        
         printf("cur mode : %d\n", mode);
         receive_message(message_id, &io_data);
 
@@ -110,10 +113,11 @@ void main_process()
             cleanup_device();
             break;
         }
-        if (io_data.input_type == READ_KEY && io_data.value != PROG)
+        if (io_data.input_type == READ_KEY && (io_data.value == VOL_UP || io_data.value == VOL_DOWN) )
         {
             // change mode
-
+            memset(line1, 0, 17);
+            memset(line2,0,17);
             // init state
             strcpy(key, INITIAL_KEY);
             strcpy(value, INITIAL_VALUE);
@@ -129,11 +133,16 @@ void main_process()
             if (mode == GET)
             {
                 control_led(1 << 4, 1 << 4, 0); // turn on led 5
+                sprintf(line1,"GET MODE");
             }
             else if (mode == PUT)
             {
                 control_led(1, 1, 0); // turn on led 1
+                sprintf(line1,"PUT MODE");
             }
+            else
+                sprintf(line1,"MERGE MODE");
+            print_lcd(line1,line2);
             continue;
         }
         switch (mode)
@@ -211,7 +220,7 @@ void main_process()
                 printf("cur key: %s\n", key);
                 control_led(1 << 2, 1 << 3, 0);
             }
-            if (io_data.input_type == RESET)
+            else if (io_data.input_type == RESET)
             {
                 // submit
                 if (strcmp(key, INITIAL_KEY) == 0)
@@ -221,16 +230,22 @@ void main_process()
                 if (temp.index == NOT_FOUND)
                 {
                     sprintf(line2, "Error");
+                    printf("Error!");
                 }
                 else
                 {
-                    sprintf(line2, "(%d, %d,%s)", temp.index, temp.key, temp.value);
+                    sprintf(line2, "(%d,%d,%s)", temp.index, temp.key, temp.value);
                     printf("[%d] %d %s\n", temp.index, temp.key, temp.value);
                 }
+                
+                
                 control_led(1 << 4, 1 << 4, 1);
+                
             }
             print_fnd(key);
-            print_lcd(line1, line2);
+            strcpy(temp1,line1);
+            strcpy(temp2,line2);
+            print_lcd(temp1, temp2);
 
             break;
         case MERGE:
