@@ -98,9 +98,10 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
 
         initial_value = arg & 0x3FFF; // Extract the lower 14 bits
 
-        snprintf(timer_data.init_values, sizeof(timer_data.init_values), "%04d", initial_value);
-        for (i = 0; i < 4; i++)
+        for (i = 3; i >= 0; --i)
         {
+            timer_data.init_values[i] = (initial_value % 10) + '0'; // 현재 자릿수를 문자로 변환
+            initial_value /= 10;
             if (timer_data.init_values[i] != '0')
                 timer_data.active_digit = i;
         }
