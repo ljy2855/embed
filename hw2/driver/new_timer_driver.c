@@ -90,16 +90,22 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
     printk("Handling IOCTL\n");
 
     int i;
+    int initial_value;
     switch (cmd)
     {
     case IOCTL_SET_OPTION:
         // Extract and set initial values for FND device control
+
+        initial_value = arg & 0x3FFF; // Extract the lower 14 bits
+
+        snprintf(timer_data.init_values, sizeof(timer_data.init_values), "%04d", initial_value);
         for (i = 0; i < 4; i++)
         {
-            timer_data.init_values[i] = (data >> (12 - 3 * i)) & 0xF;
+            if (timer_data.init_values[i] != '0')
+                timer_data.active_digit = i;
         }
-        timer_data.count = (data >> 20) & 0xFFF;
-        timer_data.interval = data >> 32;
+        timer_data.count = (arg >> 14) & 0x7F;    // Extract the next 7 bits
+        timer_data.interval = (arg >> 21) & 0x7F; // Extract the next 7 bits
         timer_data.current_number = timer_data.init_values[timer_data.active_digit];
         timer_data.rotation_count = 1;
 

@@ -17,7 +17,7 @@
 int main(int argc, char **argv)
 {
 	int dev, i;
-	int intv, cnt, init;
+	int interval, cnt, initial_value;
 	unsigned long data;
 
 	if (argc != 4)
@@ -33,8 +33,8 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	intv = atoi(argv[1]);
-	if (intv < 1 || intv > 100)
+	interval = atoi(argv[1]);
+	if (interval < 1 || interval > 100)
 	{
 		printf("Invalid TIMER_INTERVAL (1~100) !\n");
 		close(dev);
@@ -47,16 +47,12 @@ int main(int argc, char **argv)
 		close(dev);
 		return -1;
 	}
-	init = atoi(argv[3]);
+	initial_value = atoi(argv[3]);
 
 	data = 0;
-	// 비트 마스킹과 이동을 통한 데이터 조합
-	for (i = 0; i < 4; i++)
-	{
-		data |= ((uint64_t)(init >> (i * 4)) & 0xF) << (12 - 4 * i);
-	}
-	data |= ((uint64_t)(cnt & 0xFF) << 20);	 // cnt는 8비트 사용, 20번째 비트 위치부터 시작
-	data |= ((uint64_t)(intv & 0xFF) << 32); // intv는 상위 8비트에 배치
+
+	// Encode data
+	data = (initial_value & 0x3FFF) | ((cnt & 0x7F) << 14) | ((interval & 0x7F) << 21);
 
 	ioctl(dev, SET_OPTION, data);
 	ioctl(dev, COMMAND, data);
