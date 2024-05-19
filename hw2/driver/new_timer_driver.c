@@ -96,31 +96,27 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
         // Extract and set initial values for FND device control
         for (i = 0; i < 4; i++)
         {
-            timer_data.init_values[i] = (arg >> (12 - 3 * i)) & 0xF;
-            if(timer_data.init_values[3-i] != '0')
-                timer_data.active_digit = 3-i;
+            timer_data.init_values[i] = (data >> (12 - 3 * i)) & 0xF;
         }
-
-        
-        timer_data.count = (arg >> 20) & 0xFFF; // Extract count
-        timer_data.interval = arg >> 32;        // Extract interval in ms
+        timer_data.count = (data >> 20) & 0xFFF;
+        timer_data.interval = data >> 32;
         timer_data.current_number = timer_data.init_values[timer_data.active_digit];
         timer_data.rotation_count = 1;
-        
+
         timer_data.lcd_index_line1 = 0;
         timer_data.lcd_index_line2 = MAX_LCD_LINE_LENGTH;
         timer_data.lcd_index_increment1 = 1;
         timer_data.lcd_index_increment2 = -1;
         memset(timer_data.lcd_buffer, ' ', MAX_LCD_BUFFER);
-        printk("interval: %d, values : %s, cnt: %d\n",timer_data.interval,timer_data.init_values,timer_data.count);
+        printk("interval: %d, values : %s, cnt: %d\n", timer_data.interval, timer_data.init_values, timer_data.count);
         break;
 
     case IOCTL_COMMAND:
         // Configure and start the timer
-        printk("interval: %d\n",timer_data.interval);
+        printk("interval: %d\n", timer_data.interval);
         timer_data.timer.expires = jiffies + (timer_data.interval * HZ / 10);
         timer_data.timer.data = (unsigned long)&timer_data;
-        timer_data.timer.function	= fpga_timer_handler;
+        timer_data.timer.function = fpga_timer_handler;
         add_timer(&timer_data.timer);
         // mod_timer(&timer_data.timer, jiffies + msecs_to_jiffies(timer_data.interval));
         break;
@@ -226,13 +222,13 @@ static void fpga_timer_handler(unsigned long data)
     // Prepare for the next timer interval
     td->count--;
     td->current_number = (td->current_number % 8) + 1; // Rotate through 1-8
-    td->rotation_count = (td->rotation_count % 9) + 1;  // Rotate index through 1-9
+    td->rotation_count = (td->rotation_count % 9) + 1; // Rotate index through 1-9
     update_digit_and_rotation(td);
 
     // Rearm the timer
     timer_data.timer.expires = jiffies + (timer_data.interval * HZ / 10);
     timer_data.timer.data = (unsigned long)&timer_data;
-    timer_data.timer.function	= fpga_timer_handler;
+    timer_data.timer.function = fpga_timer_handler;
     add_timer(&timer_data.timer);
 }
 
