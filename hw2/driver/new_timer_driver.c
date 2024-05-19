@@ -124,7 +124,7 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
     return 0;
 }
 
-static int fpga_timer_release(struct inode *inode, struct file * file) 
+static int fpga_timer_release(struct inode *inode, struct file *file)
 {
     printk("Timer device released\n");
     device_open_count = 0;
@@ -133,65 +133,61 @@ static int fpga_timer_release(struct inode *inode, struct file * file)
 
 // helpers
 
-
 // Writes to the FND device
 void write_fnd(unsigned char *values)
 {
-    
-    __u16 value =0;
-    value +=  values[0] << 12;
+
+    __u16 value = 0;
+    value += values[0] << 12;
     value += values[1] << 8;
     value += values[2] << 4;
     value += values[3];
-    outw(value,(unsigned long) fpga_fnd_addr);
+    outw(value, (unsigned long)fpga_fnd_addr);
 }
 
 // Writes to the LED device
 void write_led(int number)
 {
 
-    outw((__u16) 0x80 >> (number -1), (unsigned long) fpga_led_addr);
-    
+    outw((__u16)0x80 >> (number - 1), (unsigned long)fpga_led_addr);
 }
 
 // Writes to the DOT device
 void write_dot(int number)
 {
     int i;
-    for(i = 0 ; i < 10 ; i++)
-        outw((__u16)(fpga_number_patterns[number][i] & 0x7F),(unsigned long) fpga_dot_addr + i * 2);
+    for (i = 0; i < 10; i++)
+        outw((__u16)(fpga_number_patterns[number][i] & 0x7F), (unsigned long)fpga_dot_addr + i * 2);
 }
 
 // Updates the text on the LCD display
 void update_lcd_display(struct timer_data *td)
 {
-    
 }
 
 // Manages the rotation and active digit logic
 void update_digit_and_rotation(struct timer_data *td)
 {
-    //clear LCD buffer
-    memset(td->lcd_buffer,' ',MAX_LCD_BUFFER);
+    // clear LCD buffer
+    memset(td->lcd_buffer, ' ', MAX_LCD_BUFFER);
 
-    if(td->rotation_count == 1){
+    if (td->rotation_count == 1)
+    {
         td->init_values[td->active_digit] = 0;
-        td->active_digit = (td->active_digit %3) + 1;
+        td->active_digit = (td->active_digit % 3) + 1;
     }
     td->init_values[td->active_digit] = td->current_number;
-
-
 }
 
 // Resets all FPGA device states
 void clear_fpga_devices(void)
 {
 
-    outw(0, (unsigned long) fpga_fnd_addr);
-    outw(0, (unsigned long) fpga_led_addr);
+    outw(0, (unsigned long)fpga_fnd_addr);
+    outw(0, (unsigned long)fpga_led_addr);
 
+    // TODO update lcd
 }
-
 
 static void fpga_timer_handler(unsigned long data)
 {
@@ -222,8 +218,8 @@ static void fpga_timer_handler(unsigned long data)
     // Prepare for the next timer interval
     td->count--;
     td->current_number = (td->current_number % 8) + 1; // Rotate through 1-8
-    td->rotation_count = (td->rotation_count % 9) + 1 // Rotate index through 1-9
-    update_digit_and_rotation(td);
+    td->rotation_count = (td->rotation_count % 9) + 1  // Rotate index through 1-9
+                         update_digit_and_rotation(td);
 
     // Rearm the timer
     mod_timer(&td->timer, jiffies + msecs_to_jiffies(td->interval));
