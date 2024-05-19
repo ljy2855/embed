@@ -1,6 +1,11 @@
 *.out
 *.o
 *.sst
+*.mod.c
+*.cmd
+*.order
+*.symvers
+.tmp_versions
 main
 
 .vscode

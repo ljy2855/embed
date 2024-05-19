@@ -114,7 +114,11 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
 
     case IOCTL_COMMAND:
         // Configure and start the timer
-        mod_timer(&timer_data.timer, jiffies + msecs_to_jiffies(timer_data.interval));
+        timer_data.timer.expires = jiffies + (timer_data.interval HZ / 10);
+        timer_data.timer.data = (unsigned long)&timer_data;
+        timer_data.timer.function	= fpga_timer_handler;
+        add_timer(&timer_data.timer);
+        // mod_timer(&timer_data.timer, jiffies + msecs_to_jiffies(timer_data.interval));
         break;
 
     default:
@@ -142,14 +146,14 @@ void write_fnd(unsigned char *values)
     value += values[1] << 8;
     value += values[2] << 4;
     value += values[3];
-    outw(value, (unsigned long)fpga_fnd_addr);
+    outw(value, (unsigned int)fpga_fnd_addr);
 }
 
 // Writes to the LED device
 void write_led(int number)
 {
 
-    outw((__u16)0x80 >> (number - 1), (unsigned long)fpga_led_addr);
+    outw((__u16)0x80 >> (number - 1), (unsigned int)fpga_led_addr);
 }
 
 // Writes to the DOT device
@@ -157,7 +161,7 @@ void write_dot(int number)
 {
     int i;
     for (i = 0; i < 10; i++)
-        outw((__u16)(fpga_number_patterns[number][i] & 0x7F), (unsigned long)fpga_dot_addr + i * 2);
+        outw((__u16)(fpga_number_patterns[number][i] & 0x7F), (unsigned int)fpga_dot_addr + i * 2);
 }
 
 // Updates the text on the LCD display
@@ -183,8 +187,8 @@ void update_digit_and_rotation(struct timer_data *td)
 void clear_fpga_devices(void)
 {
 
-    outw(0, (unsigned long)fpga_fnd_addr);
-    outw(0, (unsigned long)fpga_led_addr);
+    outw(0, (unsigned int)fpga_fnd_addr);
+    outw(0, (unsigned int)fpga_led_addr);
 
     // TODO update lcd
 }
@@ -218,11 +222,14 @@ static void fpga_timer_handler(unsigned long data)
     // Prepare for the next timer interval
     td->count--;
     td->current_number = (td->current_number % 8) + 1; // Rotate through 1-8
-    td->rotation_count = (td->rotation_count % 9) + 1  // Rotate index through 1-9
-                         update_digit_and_rotation(td);
+    td->rotation_count = (td->rotation_count % 9) + 1;  // Rotate index through 1-9
+    update_digit_and_rotation(td);
 
     // Rearm the timer
-    mod_timer(&td->timer, jiffies + msecs_to_jiffies(td->interval));
+    timer_data.timer.expires = jiffies + (timer_data.interval HZ / 10);
+    timer_data.timer.data = (unsigned long)&timer_data;
+    timer_data.timer.function	= fpga_timer_handler;
+    add_timer(&timer_data.timer);
 }
 
 static int __init fpga_timer_init(void)

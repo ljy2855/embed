@@ -15,7 +15,7 @@
 
 int main(int argc, char **argv)
 {
-	int dev;
+	int dev, i;
 	int intv, cnt, init;
 	unsigned long data;
 
@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 
 	data = 0;
 	// 비트 마스킹과 이동을 통한 데이터 조합
-	for (int i = 0; i < 4; i++)
+	for (i = 0; i < 4; i++)
 	{
 		data |= ((init >> (i * 4)) & 0xF) << (12 - 4 * i); // 4비트씩, 각 4자리에 배치
 	}
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 	data |= ((unsigned long)(intv & 0xFF) << 32); // intv는 상위 8비트에 배치
 
 	ioctl(dev, SET_OPTION, data);
-	ioctl(dev, COMMAND, data);
+	// ioctl(dev, COMMAND, data);
 
 	close(dev);
 	return 0;
