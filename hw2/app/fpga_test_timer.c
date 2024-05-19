@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <asm/ioctl.h>
 
 #define MAJOR_NUM 242
@@ -54,8 +55,8 @@ int main(int argc, char **argv)
 	{
 		data |= ((init >> (i * 4)) & 0xF) << (12 - 4 * i); // 4비트씩, 각 4자리에 배치
 	}
-	data |= ((cnt & 0xFF) << 20);				  // cnt는 8비트 사용, 20번째 비트 위치부터 시작
-	data |= ((unsigned long)(intv & 0xFF) << 32); // intv는 상위 8비트에 배치
+	data |= ((uint64_t)(cnt & 0xFF) << 20);				  // cnt는 8비트 사용, 20번째 비트 위치부터 시작
+	data |= ((uint64_t)(intv & 0xFF) << 32); // intv는 상위 8비트에 배치
 
 	ioctl(dev, SET_OPTION, data);
 	ioctl(dev, COMMAND, data);

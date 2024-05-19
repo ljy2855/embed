@@ -97,19 +97,22 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
         for (i = 0; i < 4; i++)
         {
             timer_data.init_values[i] = (arg >> (12 - 3 * i)) & 0xF;
+            if(timer_data.init_values[3-i] != '0')
+                timer_data.active_digit = 3-i;
         }
 
-        timer_data.active_digit = 0;            // Start with the first digit
+        
         timer_data.count = (arg >> 20) & 0xFFF; // Extract count
         timer_data.interval = arg >> 32;        // Extract interval in ms
         timer_data.current_number = timer_data.init_values[timer_data.active_digit];
         timer_data.rotation_count = 1;
-
+        
         timer_data.lcd_index_line1 = 0;
         timer_data.lcd_index_line2 = MAX_LCD_LINE_LENGTH;
         timer_data.lcd_index_increment1 = 1;
         timer_data.lcd_index_increment2 = -1;
         memset(timer_data.lcd_buffer, ' ', MAX_LCD_BUFFER);
+        printk("interval: %d, values : %s, cnt: %d\n",timer_data.interval,timer_data.init_values,timer_data.count);
         break;
 
     case IOCTL_COMMAND:
@@ -204,7 +207,7 @@ static void fpga_timer_handler(unsigned long data)
     if (td->count <= 0)
     {
         // Stop the timer and reset all devices
-        clear_fpga_devices();
+        // clear_fpga_devices();
         return;
     }
 
