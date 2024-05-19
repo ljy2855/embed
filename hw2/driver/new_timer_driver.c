@@ -12,7 +12,7 @@
 #include <linux/timer.h>
 
 #define TIMER_MAJOR 242
-#define TIMER_DEVICE_NAME "/dev/fpga_timer"
+#define TIMER_DEVICE_NAME "/dev/dev_driver"
 
 #define IOCTL_SET_OPTION _IOW(TIMER_MAJOR, 0, unsigned long)
 #define IOCTL_COMMAND 1
@@ -38,8 +38,8 @@ unsigned char fpga_number_patterns[10][10] = {
     {0x3e, 0x7f, 0x63, 0x63, 0x7f, 0x3f, 0x03, 0x03, 0x03, 0x03}  // 9
 };
 
-unsigned char fpga_full_pattern[10] = {0x7f, ...};
-unsigned char fpga_blank_pattern[10] = {0x00, ...};
+unsigned char fpga_full_pattern[10] = {0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f};
+unsigned char fpga_blank_pattern[10] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 static int device_open_count = 0;
 static unsigned char *fpga_fnd_addr, *fpga_led_addr, *fpga_dot_addr, *fpga_lcd_addr;
@@ -124,7 +124,7 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
     return 0;
 }
 
-static int fpga_timer_release(struct inode *inode, struct *file) // TODO 코드를 소중히 하자 (by 괴도 루팡)
+static int fpga_timer_release(struct inode *inode, struct file * file) 
 {
     printk("Timer device released\n");
     device_open_count = 0;
@@ -132,35 +132,66 @@ static int fpga_timer_release(struct inode *inode, struct *file) // TODO 코드�
 }
 
 // helpers
-void clear_fpga_devices(void)
-{
-    // Resets all FPGA device states
-}
 
+
+// Writes to the FND device
 void write_fnd(unsigned char *values)
 {
-    // Writes to the FND device
+    
+    __u16 value =0;
+    value +=  values[0] << 12;
+    value += values[1] << 8;
+    value += values[2] << 4;
+    value += values[3];
+    outw(value,(unsigned long) fpga_fnd_addr);
 }
 
+// Writes to the LED device
 void write_led(int number)
 {
-    // Writes to the LED device
+
+    outw((__u16) 0x80 >> (number -1), (unsigned long) fpga_led_addr);
+    
 }
 
+// Writes to the DOT device
 void write_dot(int number)
 {
-    // Writes to the DOT device
+    int i;
+    for(i = 0 ; i < 10 ; i++)
+        outw((__u16)(fpga_number_patterns[number][i] & 0x7F),(unsigned long) fpga_dot_addr + i * 2);
 }
 
+// Updates the text on the LCD display
 void update_lcd_display(struct timer_data *td)
 {
-    // Updates the text on the LCD display
+    
 }
 
+// Manages the rotation and active digit logic
 void update_digit_and_rotation(struct timer_data *td)
 {
-    // Manages the rotation and active digit logic
+    //clear LCD buffer
+    memset(td->lcd_buffer,' ',MAX_LCD_BUFFER);
+
+    if(td->rotation_count == 1){
+        td->init_values[td->active_digit] = 0;
+        td->active_digit = (td->active_digit %3) + 1;
+    }
+    td->init_values[td->active_digit] = td->current_number;
+
+
 }
+
+// Resets all FPGA device states
+void clear_fpga_devices(void)
+{
+
+    outw(0, (unsigned long) fpga_fnd_addr);
+    outw(0, (unsigned long) fpga_led_addr);
+
+}
+
 
 static void fpga_timer_handler(unsigned long data)
 {
@@ -190,8 +221,8 @@ static void fpga_timer_handler(unsigned long data)
 
     // Prepare for the next timer interval
     td->count--;
-    td->current_number = (td->current_number % 9) + 1; // Rotate through 1-9
-    td->rotation_count++;
+    td->current_number = (td->current_number % 8) + 1; // Rotate through 1-8
+    td->rotation_count = (td->rotation_count % 9) + 1 // Rotate index through 1-9
     update_digit_and_rotation(td);
 
     // Rearm the timer

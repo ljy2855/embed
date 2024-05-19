@@ -1,4 +1,4 @@
-obj-m = timer_driver.o 
+obj-m = new_timer_driver.o 
 CC := arm-none-linux-gnueabi-gcc
 
 KDIR    :=/work/achroimx_kernel
@@ -16,3 +16,4 @@ clean :
 	rm -rf *.order
 	rm -rf *.symvers
 	rm -rf fpga_test_timer
+	rm -rf *.cmd
