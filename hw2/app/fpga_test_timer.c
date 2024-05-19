@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 	data |= ((unsigned long)(intv & 0xFF) << 32); // intv는 상위 8비트에 배치
 
 	ioctl(dev, SET_OPTION, data);
-	// ioctl(dev, COMMAND, data);
+	ioctl(dev, COMMAND, data);
 
 	close(dev);
 	return 0;

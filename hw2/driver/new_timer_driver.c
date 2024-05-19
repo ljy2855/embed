@@ -114,7 +114,8 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
 
     case IOCTL_COMMAND:
         // Configure and start the timer
-        timer_data.timer.expires = jiffies + (timer_data.interval HZ / 10);
+        printk("interval: %d\n",timer_data.interval);
+        timer_data.timer.expires = jiffies + (timer_data.interval * HZ / 10);
         timer_data.timer.data = (unsigned long)&timer_data;
         timer_data.timer.function	= fpga_timer_handler;
         add_timer(&timer_data.timer);
@@ -226,7 +227,7 @@ static void fpga_timer_handler(unsigned long data)
     update_digit_and_rotation(td);
 
     // Rearm the timer
-    timer_data.timer.expires = jiffies + (timer_data.interval HZ / 10);
+    timer_data.timer.expires = jiffies + (timer_data.interval * HZ / 10);
     timer_data.timer.data = (unsigned long)&timer_data;
     timer_data.timer.function	= fpga_timer_handler;
     add_timer(&timer_data.timer);
