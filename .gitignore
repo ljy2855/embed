@@ -5,7 +5,8 @@
 *.cmd
 *.order
 *.symvers
+*.tar.gz
 .tmp_versions
 main
-
+20191630
 .vscode

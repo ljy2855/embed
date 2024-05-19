@@ -21,6 +21,8 @@
 #define FPGA_LED_BASE_ADDR 0x08000016
 #define FPGA_FND_BASE_ADDR 0x08000004
 #define FPGA_LCD_BASE_ADDR 0x08000090
+#define FPGA_RST_BASE_ADDR 0x08000000
+
 
 #define MAX_LCD_BUFFER 32
 #define MAX_LCD_LINE_LENGTH 16
@@ -42,10 +44,9 @@ unsigned char fpga_full_pattern[10] = {0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f, 0x7f,
 unsigned char fpga_blank_pattern[10] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 static int device_open_count = 0;
-static unsigned char *fpga_fnd_addr, *fpga_led_addr, *fpga_dot_addr, *fpga_lcd_addr;
+static unsigned char *fpga_fnd_addr, *fpga_led_addr, *fpga_dot_addr, *fpga_lcd_addr, *fpga_rst_addr;
 
-static unsigned char student_number[8] = "20191630";
-static unsigned char student_name[10] = "LeeJinYong";
+static unsigned char name[3] = "LJY";
 
 struct timer_data
 {
@@ -56,9 +57,8 @@ struct timer_data
     int active_digit;
     int current_number;
     int rotation_count;
-    int lcd_index_line1, lcd_index_line2;
-    int lcd_index_increment1, lcd_index_increment2;
-    unsigned char lcd_buffer[MAX_LCD_BUFFER + 1];
+    int finish_count;
+    int lcd_index;
 };
 
 static struct timer_data timer_data;
@@ -100,30 +100,28 @@ static int fpga_timer_ioctl(struct file *file, unsigned int cmd, unsigned long a
 
         for (i = 3; i >= 0; --i)
         {
-            timer_data.init_values[i] = (initial_value % 10) + '0'; // 현재 자릿수를 문자로 변환
+            timer_data.init_values[i] = (initial_value % 10); // 현재 자릿수를 문자로 변환
             initial_value /= 10;
-            if (timer_data.init_values[i] != '0')
+            if (timer_data.init_values[i] != 0)
                 timer_data.active_digit = i;
         }
         timer_data.count = (arg >> 14) & 0x7F;    // Extract the next 7 bits
         timer_data.interval = (arg >> 21) & 0x7F; // Extract the next 7 bits
         timer_data.current_number = timer_data.init_values[timer_data.active_digit];
         timer_data.rotation_count = 1;
+        timer_data.finish_count = 3;
 
-        timer_data.lcd_index_line1 = 0;
-        timer_data.lcd_index_line2 = MAX_LCD_LINE_LENGTH;
-        timer_data.lcd_index_increment1 = 1;
-        timer_data.lcd_index_increment2 = -1;
-        memset(timer_data.lcd_buffer, ' ', MAX_LCD_BUFFER);
-        printk("interval: %d, values : %s, cnt: %d\n", timer_data.interval, timer_data.init_values, timer_data.count);
+
+
         break;
 
     case IOCTL_COMMAND:
         // Configure and start the timer
-        printk("interval: %d\n", timer_data.interval);
         timer_data.timer.expires = jiffies + (timer_data.interval * HZ / 10);
         timer_data.timer.data = (unsigned long)&timer_data;
         timer_data.timer.function = fpga_timer_handler;
+
+        while(inw((unsigned int) fpga_rst_addr) != 0);
         add_timer(&timer_data.timer);
         // mod_timer(&timer_data.timer, jiffies + msecs_to_jiffies(timer_data.interval));
         break;
@@ -174,18 +172,42 @@ void write_dot(int number)
 // Updates the text on the LCD display
 void update_lcd_display(struct timer_data *td)
 {
+    char line1[17] = {0,}, line2[17] = {0,};
+    int i,temp = td->lcd_index;
+    __u16 value;
+    
+    memset(line1,' ',MAX_LCD_LINE_LENGTH);
+    memset(line2,' ',MAX_LCD_LINE_LENGTH);
+
+    snprintf(line1, sizeof(line1),"20191630%8d",td->count);
+    printk("%s\n",line1);
+    for(i = 0 ; i < 3 ; i++){
+        line2[temp] = name[i];
+        temp = (temp+ 1) % MAX_LCD_LINE_LENGTH; 
+    }
+    td->lcd_index = (td->lcd_index+ 1) % MAX_LCD_LINE_LENGTH;
+    for(i = 0 ; i < MAX_LCD_LINE_LENGTH ; i++){
+        value = ((line1[i] & 0xFF) << 8) | (line1[i + 1] & 0xFF);
+        outw(value,(unsigned int)fpga_lcd_addr+i);
+        i++;
+    }
+    for(i = 0 ; i < MAX_LCD_LINE_LENGTH ; i++){
+        value = ((line2[i] & 0xFF) << 8) | (line2[i + 1] & 0xFF);
+        outw(value,(unsigned int)fpga_lcd_addr+i+MAX_LCD_LINE_LENGTH);
+        i++;
+    }
+
 }
 
 // Manages the rotation and active digit logic
 void update_digit_and_rotation(struct timer_data *td)
 {
     // clear LCD buffer
-    memset(td->lcd_buffer, ' ', MAX_LCD_BUFFER);
 
     if (td->rotation_count == 1)
     {
         td->init_values[td->active_digit] = 0;
-        td->active_digit = (td->active_digit % 3) + 1;
+        td->active_digit = (td->active_digit + 1) % 4;
     }
     td->init_values[td->active_digit] = td->current_number;
 }
@@ -193,11 +215,45 @@ void update_digit_and_rotation(struct timer_data *td)
 // Resets all FPGA device states
 void clear_fpga_devices(void)
 {
-
+    int i;
     outw(0, (unsigned int)fpga_fnd_addr);
     outw(0, (unsigned int)fpga_led_addr);
-
+    for (i = 0; i < 10; i++)
+        outw(0, (unsigned int)fpga_dot_addr + i * 2);
+    for (i = 0; i < MAX_LCD_BUFFER; i++)
+    {
+        outw((__u16)((' ' & 0xFF) << 8) | (' ' & 0xFF), (unsigned int)fpga_lcd_addr + i);
+        i++;
+    }
     // TODO update lcd
+}
+
+static void finish_handler(unsigned long data){
+    struct timer_data *td = (struct timer_data *)data;
+    char buffer[MAX_LCD_BUFFER+1];
+    int i;
+    __u16 value;
+    if (td->finish_count <= 0)
+    {
+        // Stop the timer and reset all devices
+        clear_fpga_devices();
+        return;
+    }
+
+    snprintf(buffer,sizeof(buffer),"Time's up!     0Shutdown in %1d...",td->finish_count);
+    for(i = 0 ; i < MAX_LCD_BUFFER ; i++){
+        value = ((buffer[i] & 0xFF) << 8) | (buffer[i + 1] & 0xFF);
+        outw(value,(unsigned int)fpga_lcd_addr+i);
+        i++;
+    }
+    
+
+    td->finish_count--;
+    timer_data.timer.expires = jiffies + HZ ;
+    timer_data.timer.data = (unsigned long)&timer_data;
+    timer_data.timer.function = finish_handler;
+    add_timer(&timer_data.timer);
+
 }
 
 static void fpga_timer_handler(unsigned long data)
@@ -209,8 +265,17 @@ static void fpga_timer_handler(unsigned long data)
 
     if (td->count <= 0)
     {
-        // Stop the timer and reset all devices
-        // clear_fpga_devices();
+        // Stop the timer and reset devices
+        outw(0, (unsigned int)fpga_fnd_addr);
+        outw(0, (unsigned int)fpga_led_addr);
+        for (i = 0; i < 10; i++)
+            outw(0, (unsigned int)fpga_dot_addr + i * 2);
+
+        // call finish handler timer
+        timer_data.timer.expires = jiffies + HZ ;
+        timer_data.timer.data = (unsigned long)&timer_data;
+        timer_data.timer.function = finish_handler;
+        add_timer(&timer_data.timer);
         return;
     }
 
@@ -229,7 +294,7 @@ static void fpga_timer_handler(unsigned long data)
     // Prepare for the next timer interval
     td->count--;
     td->current_number = (td->current_number % 8) + 1; // Rotate through 1-8
-    td->rotation_count = (td->rotation_count % 9) + 1; // Rotate index through 1-9
+    td->rotation_count = (td->rotation_count % 8) + 1; // Rotate index through 1-9
     update_digit_and_rotation(td);
 
     // Rearm the timer
@@ -255,6 +320,7 @@ static int __init fpga_timer_init(void)
     fpga_led_addr = ioremap(FPGA_LED_BASE_ADDR, 0x1);
     fpga_dot_addr = ioremap(FPGA_DOT_BASE_ADDR, 0x10);
     fpga_lcd_addr = ioremap(FPGA_LCD_BASE_ADDR, 0x32);
+    fpga_rst_addr = ioremap(FPGA_RST_BASE_ADDR, 0x1);
 
     init_timer(&(timer_data.timer));
 
@@ -273,6 +339,7 @@ static void __exit fpga_timer_exit(void)
     iounmap(fpga_dot_addr);
     iounmap(fpga_led_addr);
     iounmap(fpga_fnd_addr);
+    iounmap(fpga_rst_addr);
 
     unregister_chrdev(TIMER_MAJOR, TIMER_DEVICE_NAME);
 }
