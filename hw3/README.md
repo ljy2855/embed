@@ -14,4 +14,4 @@ insmod drvier and make device file
 
 ### Run
 
-`./fpga_test_timer TIMER_INTERVAL[1-100] TIMER_CNT[1-100] TIMER_INIT[0001-8000]` (in device)
+`./fpga_test_timer` (in device)

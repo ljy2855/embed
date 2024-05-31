@@ -1,4 +1,4 @@
 #!/bin/bash
 
-insmod new_timer_driver.ko
-mknod /dev/dev_driver c 242 0
+insmod stopwatch_driver.ko
+mknod /dev/stopwatch c 242 0
